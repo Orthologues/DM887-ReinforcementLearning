@@ -1,0 +1,5 @@
+*/.DS_Store
+.DS_Store
+GridWorld/
+!GridWorld/exer1_grid_env.py
+.vscode/
