@@ -7,7 +7,7 @@ Date: 28.02.2024
 Steps: 
 1) Create a GridWorld environment of size 10x10 or bigger.
 
-2) Initialize your value function to an arbitrarily large value, e.g. J(x) = +inf for all x if you store costs, J(x) = -inf if you store rewards.
+2) Initialize your value function to an arbitrarily large value, e.g. J(x) = +inf for all x if you store returnss, J(x) = -inf if you store rewards.
 
 3) Perform policy evaluation by implementing two versions of Monte Carlo simulation: a) First-visit, b) Every-visit. Define a convergence criterion, e.g. an epsilon tolerance below which the value of a state is not counted as changed, and run the algorithm until this condition is satisfied. Count how many samples you have taken and how many simulation rounds you have started.
 
@@ -56,7 +56,7 @@ class Monte_Carlo_learner:
         self.Q_sa: np.ndarray[float] = np.full((env.state_count, env.action_size), -pow(10, 7)) # tracking cumulative rewards
         self.N_sa: np.ndarray[int] = np.zeros((env.state_count, env.action_size)) # tracking numbers of visits to each state-action pair # tracking the numbers that each state-action pair has been visited in an episode
         self.S_A_R: List[Tuple[int, int, int]] = [] # tracking the state-action-reward tuples that have been visited in an episode
-        self.G_t: List[float] = [] # tracking the cumulative cost at each step per episode
+        self.G_t: List[float] = [] # tracking the cumulative returns at each step per episode
         self.pi = np.random.choice(env.action_values, size=env.state_count)
         self.viable_cells: List[Tuple[int, int]] = list(self.env.state_dict.keys())
         self.coord_to_states: Dict[Tuple[int, int], int] = {coord: index for index, coord in enumerate(self.viable_cells)}
@@ -80,16 +80,16 @@ class Monte_Carlo_learner:
             return next_state
         return state
 
-    def get_reward(self, next_state: int) -> int:
+    def get_reward(self, state: int) -> int:
         # get the reward by state_dict of the grid environment
-        return self.env.state_dict[self.viable_cells[next_state]]['reward']
+        return self.env.state_dict[self.viable_cells[state]]['reward']
     
-    def calculate_costs(self):
+    def calculate_returns(self):
         for i in range(len(self.S_A_R)):
-            discounted_reward = 0
-            for t, (state, action, reward) in enumerate(self.S_A_R[i+1: ]):
-                discounted_reward += reward * pow(self.gamma, t)
-            self.G_t.append(discounted_reward)
+            returns = 0
+            for k, (_, _, reward) in enumerate(self.S_A_R[i+1: ]):
+                returns += reward * pow(self.gamma, k)
+            self.G_t.append(returns)
     
     def reset_learning(self):
         np.random.seed(42)
@@ -116,7 +116,7 @@ class Monte_Carlo_learner:
     def run_first_visit_pi_evaluation(self):
         seen_S_A_pairs: Set[Tuple[int, int]] = set()
         # run the first-visit Monte Carlo simulation
-        for i, (state, action, reward) in enumerate(self.S_A_R):
+        for i, (state, action, _) in enumerate(self.S_A_R):
             if (state, action) not in seen_S_A_pairs:
                 seen_S_A_pairs.add((state, action))
                 self.N_sa[state, action] += 1
@@ -124,7 +124,7 @@ class Monte_Carlo_learner:
                 self.simulated_samples += 1
 
     def run_every_visit_pi_evaluation(self):
-        for i, (state, action, reward) in enumerate(self.S_A_R):
+        for i, (state, action, _) in enumerate(self.S_A_R):
             self.N_sa[state, action] += 1
             self.Q_sa[state, action] += (self.G_t[i] - self.Q_sa[state, action])/self.N_sa[state, action]
             self.simulated_samples += 1
@@ -159,32 +159,39 @@ class Monte_Carlo_learner:
         
         # start the simulation        
         if mode == "first-visit":
+            jackpot_count = 0
             while True:
                 self.generate_episode()
-                self.calculate_costs()
+                self.calculate_returns()
                 Q_sa_prev = self.Q_sa.copy()
                 self.run_first_visit_pi_evaluation()
                 self.improve_pi()
                 self.simulatd_episodes += 1
                 delta = np.max(np.abs(Q_sa_prev - self.Q_sa))
+                if self.S_A_R[-1][2] == 100:
+                    jackpot_count += 1
                 # exit the loop when the model converges
-                if delta < self.epsilon:
+                if delta < self.epsilon*0.1 and jackpot_count >= 10:
                     break
                 self.reset_episode()
         else:
+            jackpot_count = 0
             while True:
                 self.generate_episode()
-                self.calculate_costs()
+                self.calculate_returns()
                 Q_sa_prev = self.Q_sa.copy()
                 self.run_every_visit_pi_evaluation()
                 self.improve_pi()
                 self.simulatd_episodes += 1
                 delta = np.max(np.abs(Q_sa_prev - self.Q_sa))
+                if self.S_A_R[-1][2] == 100:
+                    jackpot_count += 1
                 # exit the loop when the model converges
-                if delta < self.epsilon:
+                if delta < self.epsilon*0.1 and jackpot_count >= 10:
                     break
                 self.reset_episode()
-        
+        print(f"The number of episodes hitting the goal: {jackpot_count}")
+
 
 if __name__ == '__main__':
     # The agent can steer the environment with 90% accuracy, so slip shall be 1-0.9=0.1
