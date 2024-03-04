@@ -19,6 +19,7 @@ Steps:
 import numpy as np
 from gridworld import GridWorld
 from typing import Tuple, Set, List, Dict, Union
+from random import choices
 from math import pow
 
 """
@@ -54,10 +55,8 @@ class Monte_Carlo_learner:
         self.epsilon = epsilon
         self.Q_sa: np.ndarray[float] = np.full((env.state_count, env.action_size), -pow(10, 7)) # tracking cumulative rewards
         self.N_sa: np.ndarray[int] = np.zeros((env.state_count, env.action_size)) # tracking numbers of visits to each state-action pair # tracking the numbers that each state-action pair has been visited in an episode
-        # tracking the state-action-reward tuples that have been visited in an episode
-        self.S_A_R: List[Tuple[int, int, int]] = [] 
-        # tracking the discounted reward of each state-action pair at an episode
-        self.G_t: List[float] = []
+        self.S_A_R: List[Tuple[int, int, int]] = [] # tracking the state-action-reward tuples that have been visited in an episode
+        self.G_t: List[float] = [] # tracking the cumulative cost at each step per episode
         self.pi = np.random.choice(env.action_values, size=env.state_count)
         self.viable_cells: List[Tuple[int, int]] = list(self.env.state_dict.keys())
         self.coord_to_states: Dict[Tuple[int, int], int] = {coord: index for index, coord in enumerate(self.viable_cells)}
@@ -85,7 +84,7 @@ class Monte_Carlo_learner:
         # get the reward by state_dict of the grid environment
         return self.env.state_dict[self.viable_cells[next_state]]['reward']
     
-    def calculate_discounted_reward(self):
+    def calculate_costs(self):
         for i in range(len(self.S_A_R)):
             discounted_reward = 0
             for t, (state, action, reward) in enumerate(self.S_A_R[i+1: ]):
@@ -131,8 +130,25 @@ class Monte_Carlo_learner:
             self.simulated_samples += 1
 
     def improve_pi(self):
-        for s, a, r in self.S_A_R:
-            self.pi[s] = np.argmax(self.Q_sa[s, ])
+        # implementing epsilon-greedy policy improvement
+        for s, _, r in self.S_A_R:
+            optimal_a = np.argmax(self.Q_sa[s, ])
+            # get a set of all viable actions
+            viable_a: Set[int] = set()
+            for a in self.env.action_values:
+                if self.get_next_state(s, a) != s:
+                    viable_a.add(a)
+            # create a probability dictionary with epsilon
+            prob_dict: Dict[int, float] = dict()
+            size_a = len(viable_a)
+            for a in viable_a:
+                if a == optimal_a:
+                    prob_dict[a] = 1 - self.epsilon + self.epsilon/size_a
+                else:
+                    prob_dict[a] = self.epsilon/size_a
+            # choose the updated policy using the probability list
+            updated_pi = choices(list(prob_dict.keys()), list(prob_dict.values()), k=1)[0]
+            self.pi[s] = updated_pi
     
     def run_mc_simulation(self, mode="first-visit"):
 
@@ -145,7 +161,7 @@ class Monte_Carlo_learner:
         if mode == "first-visit":
             while True:
                 self.generate_episode()
-                self.calculate_discounted_reward()
+                self.calculate_costs()
                 Q_sa_prev = self.Q_sa.copy()
                 self.run_first_visit_pi_evaluation()
                 self.improve_pi()
@@ -158,7 +174,7 @@ class Monte_Carlo_learner:
         else:
             while True:
                 self.generate_episode()
-                self.calculate_discounted_reward()
+                self.calculate_costs()
                 Q_sa_prev = self.Q_sa.copy()
                 self.run_every_visit_pi_evaluation()
                 self.improve_pi()
