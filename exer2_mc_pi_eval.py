@@ -29,13 +29,13 @@ Assignment of constants to be used in Monte-Carlo policy evaluation
 MY_GRID: str=\
     """
     wwwwwwwwwwwwwwwwww
-    wa  o   w  w     w
-    w       w        w
-    www  o  www    www
-    w           o    w
+    wa      w  w     w
+    w   o   w        w
+    www     www    www
+    w   o        o   w
     wwwww    o     www
     w     wwwwww     w
-    w     w    w     w
+    w     w    w  o  w
     ww         ww   gw
     wwwwwwwwwwwwwwwwww
     """
@@ -157,14 +157,13 @@ class Monte_Carlo_learner:
             
     
     def run_mc_simulation(self, mode="first-visit"):
-
-        self.reset_learning()
-        
         if mode not in {"first-visit", "every-visit"}:
             raise ValueError(f"mode {mode} is not supported")
         
+        self.reset_learning()
         # start the simulation        
         if mode == "first-visit":
+            delta = np.inf
             while True:
                 self.generate_episode()
                 self.calculate_returns()
@@ -172,12 +171,15 @@ class Monte_Carlo_learner:
                 self.run_first_visit_pi_evaluation()
                 self.improve_pi()
                 self.episode += 1
-                delta = np.max(np.abs(Q_sa_prev - self.Q_sa))
+                delta = min(delta, np.max(np.abs(Q_sa_prev - self.Q_sa)))
+                if self.episode%100==0:
+                    print(f"Delta at episode {self.episode}: {delta}")
                 # exit the loop when the model converges
-                if delta < 5e-3 and delta > 0:
+                if delta < 2e-3:
                     break
                 self.reset_episode()
         else:
+            delta = np.inf
             while True:
                 self.generate_episode()
                 self.calculate_returns()
@@ -185,9 +187,11 @@ class Monte_Carlo_learner:
                 self.run_every_visit_pi_evaluation()
                 self.improve_pi()
                 self.episode += 1
-                delta = np.max(np.abs(Q_sa_prev - self.Q_sa))
+                delta = min(delta, np.max(np.abs(Q_sa_prev - self.Q_sa)))
+                if self.episode%100==0:
+                    print(f"Delta at episode {self.episode}: {delta}")
                 # exit the loop when the model converges
-                if delta < 5e-3 and delta > 0:
+                if delta < 2e-3:
                     break
                 self.reset_episode()
 

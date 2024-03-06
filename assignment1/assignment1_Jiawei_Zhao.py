@@ -24,8 +24,8 @@ Game B needs to fulfill the following requirements:
 GRID_A: str=\
     """
     wwwwwwwwwwwwwwwwwwww
-    wa       w         w
-    w       w          w
+    w        w         w
+    w       w    a     w
     www     www      www
     w                  w
     w    o             w
@@ -58,7 +58,7 @@ GRID_B: str=\
     w        o     o   w
     w   o   wwwww      w
     w         w     o  w
-    w   o o   w        w
+    w   o     w        w
     w        ow        w
     w    o             w
     w                  w
@@ -101,8 +101,11 @@ class Q_learning_trainer():
         self.plotting_n_step = plotting_n_step        
         # tracking the returns (cost) per time step at each episode to update the Q-table
         self.G_t: np.ndarray[float] = []
-        # Q-table that tracks the expected future costs to be minimized
-        self.Q_sa: np.ndarray[float] = np.full((env.state_count, env.action_size), pow(10, 7)) 
+        # V array
+        self.Vs: np.ndarray[Union[int, float]] = np.zeros(shape=env.state_count)
+        # Q-table that tracks the expected future costs to be minimized, so the initial values are set to be very large
+        self.Q_sa: np.ndarray[float] = np.full((env.state_count, env.action_size), pow(10, 6)) 
+        self.S_A_R: List[Tuple[int, int, int]] = []
         # tracking the behaviour policies
         self.episode = 0
         self.time_step = 0
@@ -136,10 +139,28 @@ class Q_learning_trainer():
         # choose the updated policy using the probability list
         return choices(list(prob_dict.keys()), weights=list(prob_dict.values()), k=1)[0]
 
-    def generate_episode(self):
+    def generate_episode(self, initial_s: int):
         if self.episode == 0:
             self.initialize_random_policies()
-        pass
+        state = initial_s
+        while True:
+            if self.env.state_dict[self.states_to_coords[state]]['done']:
+                break
+            # create a probability dictionary using epsilon-greedy behavior policy  
+            prob_dict: Dict[int, float] = dict()
+            viable_a = self.viable_actions[state]
+            size_a = len(viable_a)
+            for a in viable_a:
+                if a == self.pi[state]:
+                    prob_dict[a] = 1 - self.epsilon + self.epsilon/size_a
+                else:
+                    prob_dict[a] = self.epsilon/size_a
+            # choose the updated policy using the probability list
+            chosen_pi = choices(list(prob_dict.keys()), list(prob_dict.values()), k=1)[0]
+            action = chosen_pi
+            next_state = self.get_next_state(state, action)
+            self.S_A_R.append((state, action, self.get_reward(next_state)))
+            state = next_state
 
     def set_alpha(self, alpha: float):
         self.alpha = alpha
@@ -184,6 +205,10 @@ class Q_learning_trainer():
             next_state = self.coords_to_states[next_coord]
             return next_state
         return state
+
+    def get_reward(self, state: int) -> int:
+        # get the reward by state_dict of the grid environment
+        return self.env.state_dict[self.states_to_coords[state]]['reward']
 
     def get_immediate_cost(self, state: int) -> int:
         # get the negative immediate reward by state_dict of the grid env
