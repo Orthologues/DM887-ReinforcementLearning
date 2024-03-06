@@ -7,7 +7,7 @@ Date: 28.02.2024
 Steps: 
 1) Create a GridWorld environment of size 10x10 or bigger.
 
-2) Initialize your value function to an arbitrarily large value, e.g. J(x) = +inf for all x if you store returnss, J(x) = -inf if you store rewards.
+2) Initialize your value function to an arbitrarily large value, e.g. J(x) = +pow(10, 6) for all x if you store returnss, J(x) = -pow(10, 6) if you store rewards.
 
 3) Perform policy evaluation by implementing two versions of Monte Carlo simulation: a) First-visit, b) Every-visit. Define a convergence criterion, e.g. an epsilon tolerance below which the value of a state is not counted as changed, and run the algorithm until this condition is satisfied. Count how many samples you have taken and how many simulation rounds you have started.
 
@@ -32,7 +32,7 @@ MY_GRID: str=\
     wa  o   w  w     w
     w       w        w
     www  o  www    www
-    w  o        o    w
+    w           o    w
     wwwww    o     www
     w     wwwwww     w
     w     w    w     w
@@ -52,7 +52,7 @@ class Monte_Carlo_learner:
         self.simulated_samples = 0
         self.episode = 0
         self.epsilon = epsilon
-        self.Q_sa: np.ndarray[float] = np.full((env.state_count, env.action_size), -pow(10, 7)) # tracking cumulative rewards
+        self.Q_sa: np.ndarray[float] = np.full((env.state_count, env.action_size), -pow(10, 6)) # tracking cumulative rewards
         self.N_sa: np.ndarray[int] = np.zeros((env.state_count, env.action_size)) # tracking numbers of visits to each state-action pair # tracking the numbers that each state-action pair has been visited in an episode
         self.S_A_R: List[Tuple[int, int, int]] = [] # tracking the state-action-reward tuples that have been visited in an episode
         self.G_t: List[float] = [] # tracking the cumulative returns at each step per episode
@@ -63,7 +63,7 @@ class Monte_Carlo_learner:
 
     def get_next_state(self, state: int, action: int) -> int:
         coord = self.states_to_coords[state]
-        next_coord: Tuple[Union[int, float], Union[int, float]] = (np.inf, np.inf)
+        next_coord: Tuple[Union[int, float], Union[int, float]] = (pow(10, 6), pow(10, 6))
         if action == 0:
             next_coord = (coord[0]+1, coord[1])
         elif action == 1:
@@ -92,7 +92,7 @@ class Monte_Carlo_learner:
             self.G_t.append(returns)
     
     def reset_learning(self):
-        self.Q_sa: np.ndarray[float] = np.full((self.env.state_count, self.env.action_size), -pow(10, 7)) 
+        self.Q_sa: np.ndarray[float] = np.full((self.env.state_count, self.env.action_size), -pow(10, 6)) 
         self.N_sa: np.ndarray[int] = np.zeros((self.env.state_count, self.env.action_size)) 
         self.pi = np.random.choice(self.env.action_values, size=self.env.state_count)
 
@@ -174,7 +174,7 @@ class Monte_Carlo_learner:
                 self.episode += 1
                 delta = np.max(np.abs(Q_sa_prev - self.Q_sa))
                 # exit the loop when the model converges
-                if delta < 1e-3:
+                if delta < 5e-3 and delta > 0:
                     break
                 self.reset_episode()
         else:
@@ -187,7 +187,7 @@ class Monte_Carlo_learner:
                 self.episode += 1
                 delta = np.max(np.abs(Q_sa_prev - self.Q_sa))
                 # exit the loop when the model converges
-                if delta < 1e-3:
+                if delta < 5e-3 and delta > 0:
                     break
                 self.reset_episode()
 
@@ -195,7 +195,7 @@ class Monte_Carlo_learner:
 if __name__ == '__main__':
     # The agent can steer the environment with 90% accuracy, so slip shall be 1-0.9=0.1
     my_env = GridWorld(MY_GRID, random_state=42)
-    original_Q_sa = np.full((my_env.state_count, my_env.action_size), -pow(10, 7))
+    original_Q_sa = np.full((my_env.state_count, my_env.action_size), -pow(10, 6))
     mc_learner = Monte_Carlo_learner(my_env)
     mc_learner.run_mc_simulation()
     print(f"\"First-visit\" policy evaluation, Simulated episodes: {mc_learner.episode}, Simulated samples: {mc_learner.simulated_samples}")

@@ -91,7 +91,7 @@ in tabular form that uses an epsilon-greedy behavior policy with epsilon=0.1, 0.
 Repeat the whole training process ten times.
 """
 class Q_learning_trainer():
-    def __init__(self, env: GridWorld, epsilon: float, n_step: int, alpha=0.01, gamma=0.9, repetitions=10, plotting_n_step=5):
+    def __init__(self, env: GridWorld, epsilon: float, n_step: int, alpha=0.05, gamma=0.9, repetitions=10, plotting_n_step=5):
         self.env = env
         self.n_step = n_step
         self.gamma = gamma
@@ -107,7 +107,7 @@ class Q_learning_trainer():
         self.episode = 0
         self.time_step = 0
         self.Q_sa_mean_and_stderr: List[Tuple[float, float]] = []
-        self.bpi = np.zeros(shape=env.state_count)
+        self.pi = np.zeros(shape=env.state_count)
         self.states_to_coords: List[Tuple[int, int]] = list(self.env.state_dict.keys())
         self.coords_to_states: Dict[Tuple[int, int], int] = {coord: index for index, coord in enumerate(self.states_to_coords)}
         self.viable_actions: Dict[int, Set[int]] = dict()
@@ -120,9 +120,22 @@ class Q_learning_trainer():
                 if next_s == s:
                     continue
                 viable_a.add(a)
-            self.bpi[s] = np.random.choice(list(viable_a))
+            self.pi[s] = np.random.choice(list(viable_a))
             self.viable_actions[s] = viable_a
     
+    def choose_action_by_epsilon_greedy(self, state: int) -> int:
+        # create a probability dictionary using epsilon-greedy behavior policy  
+        prob_dict: Dict[int, float] = dict()
+        viable_a = self.viable_actions[state]
+        size_a = len(viable_a)
+        for a in viable_a:
+            if a == self.pi[state]:
+                prob_dict[a] = 1 - self.epsilon + self.epsilon/size_a
+            else:
+                prob_dict[a] = self.epsilon/size_a
+        # choose the updated policy using the probability list
+        return choices(list(prob_dict.keys()), weights=list(prob_dict.values()), k=1)[0]
+
     def generate_episode(self):
         if self.episode == 0:
             self.initialize_random_policies()
@@ -150,7 +163,7 @@ class Q_learning_trainer():
     def start_training(self):
         np.random.seed(42)
         self.Q_sa: np.ndarray[float] = np.full((self.state_count, self.action_size), pow(10, 7)) 
-        self.bpi = np.random.choice(self.env.action_values, size=self.env.state_count)
+        self.pi = np.random.choice(self.env.action_values, size=self.env.state_count)
         self.Q_sa_mean_and_stderr = []
 
     def get_next_state(self, state: int, action: int) -> int:
@@ -190,7 +203,7 @@ class Q_learning_trainer():
 
     def update_behaviour_pi(self, s: int):
         # base it on the epsilon-greedy policy
-        self.bpi[s] = np.argmax(self.Q_sa[s, ])
+        self.pi[s] = np.argmax(self.Q_sa[s, ])
 
     def run_N_step_Q_learning(self):
         pass
