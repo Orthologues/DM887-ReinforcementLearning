@@ -26,24 +26,24 @@ Game B needs to fulfill the following requirements:
 GRID_A: str=\
     """
     wwwwwwwwwwwwwwwwwwww
-    wa       w         w
-    w        w         w
-    www     www  o   www
+    wa              o  w
+    w                  w
+    www     www      www
     w                  w
     w             o    w
     w                  w
-    w             o    w
-    w       wwwww      w
+    w                  w
+    w       www        w
     w         w    o   w
     w         w        w
     w         w        w
     w                  w
-    w            o     w
-    w        o         w
-    wwww             www
-    w          w       w
-    w    g     w       w
-    w          w       w
+    w                  w
+    w                  w
+    wwww    o         ww
+    w                  w
+    w  o               w
+    w              g   w
     wwwwwwwwwwwwwwwwwwww
     """
 
@@ -51,23 +51,23 @@ GRID_A: str=\
 GRID_B: str=\
     """
     wwwwwwwwwwwwwwwwwwww
-    wa      w          w
-    w       w          w
+    wa o    w          w
+    w      w          w
     www  o  www      www
     w       o          w
-    w    o      o      w
-    w      o   o       w
-    w        o     o   w
-    w   o   wwwww      w
-    w         w     o  w
-    w   o     w        w
-    w        ow        w
-    w    o             w
-    w                  w
-    w                  w
-    wwww             www
-    w          w       w
-    w          w       w
+    w         o o      w
+    w          o o     w
+    w           o o   w
+    w       www   o    w
+    w         wooo o o w
+    w         w    o   w
+    w        ow    o   w
+    w      oooo    o   w
+    w         o    o   w
+    w         o    o   w
+    wwww           oowww
+    w          w   o   w
+    w          w  oo   w
     w          w      gw
     wwwwwwwwwwwwwwwwwwww
     """
@@ -79,12 +79,15 @@ def define_two_grid_worlds() -> Tuple[GridWorld, GridWorld]:
     env_b = GridWorld(GRID_B, random_state=42)
     """
     Edit env_b.state_dict
+    change the holes to be non-terminal
+    place the holes on the shortest paths to the goal
     change the immediate cost of falling into a hole to a much smaller value than 100,
-    to lure the agent to fall into a hole for higher immediate rewards
+    to lure the agent to choose a shorter-path for higher immediate rewards
     """
     for v in env_b.state_dict.values():
         if v['type'] == 'hole':
-            v['reward'] = -5.0
+            v['reward'] = -5
+            v['done'] = False
     return env_a, env_b
 
 """
@@ -99,7 +102,7 @@ n_eps_pairs = [(n, eps) for eps in eps_list for n in n_list ]
 
 class Q_learning_trainer():
 
-    def __init__(self, env: GridWorld, epsilon, n_step, alpha=0.8, gamma=0.9, max_round=10, max_episode=500, plotting_n_step=5):
+    def __init__(self, env: GridWorld, epsilon, n_step, alpha=0.2, gamma=0.9, max_round=10, max_episode=500, plotting_n_step=5):
         np.random.seed(42)
         self.env = env
         self.n_step = n_step
