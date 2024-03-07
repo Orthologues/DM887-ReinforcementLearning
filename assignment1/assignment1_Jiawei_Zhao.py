@@ -98,7 +98,7 @@ Repeat the whole training process ten times.
 
 eps_list = [0.1, 0.2, 0.3]
 n_list = [1, 2, 3]
-n_eps_pairs = [(n, eps) for eps in eps_list for n in n_list ]
+n_eps_pairs = [(n, eps) for n in n_list for eps in eps_list ]
 
 class Q_learning_trainer():
 
@@ -290,7 +290,6 @@ def run_game(env, game_name, n, eps):
         mean_stderr_dataset,
         delimiter =", ",
         fmt ='% s')
-    #plot_Q_mean_and_stderr(datasets=mean_stderr_datasets, data_legends=data_legends, fname_suffix="GameA")
 
 
 # the plotting function 
@@ -302,26 +301,26 @@ def plot_Q_mean_and_stderr(datasets: List[List[Tuple[float, float]]], data_legen
     colors = plt.get_cmap("tab10")
     # Create the plot
     fig, ax = plt.subplots(figsize=(16, 9))
+    mean_lines = []
 
     # Plot lines for mean values
     for i, dataset in enumerate(datasets):
         episode = [ i*plotting_n_step for i in range(0, len(dataset)) ]
         mean = [ el[0] for el in dataset ]
         color = colors(i/len(datasets))  # Get unique color from colormap
-
-        ax.plot(episode, mean, color=color)
+        mean_line, = ax.plot(episode, mean, color=color)
+        mean_lines.append(mean_line)
         # Fill between mean +/- standard error with semi-transparent color
         mean_upper = [ el[0] + el[1] for el in dataset ]
         mean_lower = [ el[0] - el[1] for el in dataset ]
         ax.fill_between(episode, mean_upper, mean_lower, alpha=0.2, color=color)
-        
         # Add labels and title
-        ax.set_xlabel("Epoch")
+        ax.set_xlabel("Episode")
         ax.set_ylabel("Mean Cumulative Cost")
-        ax.set_title("Epsilon-greedy N-step Q-learning")
+        ax.set_title(f"Epsilon-greedy N-step Q-learning ({fname_suffix})")
 
     # Add legend
-    ax.legend(data_legends, loc="upper right")
+    ax.legend(mean_lines, data_legends, loc="upper right")
 
     fig.savefig(f"learning-curve-{fname_suffix}.png", dpi=150, bbox_inches='tight')    
 
@@ -334,8 +333,27 @@ if __name__ == "__main__":
     for n, eps in n_eps_pairs:
         run_game(env_a, "a", n, eps)
         run_game(env_b, "b", n, eps)
-    
 
+
+    # read the training record of game A in CSV 
+    learning_curves, legends = [], []
+    for n, eps in n_eps_pairs:
+        alt_eps = sub("\.", "-", str(eps))
+        arr = np.loadtxt(f"n_{n}_eps_{alt_eps}_a.csv", delimiter=",", dtype=float)
+        learning_curve: List[Tuple[float, float]] = [(el[0], el[1]) for el in arr]
+        learning_curves.append(learning_curve)
+        legends.append(f"N={n}, eps={eps}")
+        plot_Q_mean_and_stderr(datasets=learning_curves, data_legends=legends, fname_suffix='game_a')
+
+
+    # read the training record of game B in CSV 
+    learning_curves, legends = [], []
+    for n, eps in n_eps_pairs:
+        arr = np.loadtxt(f"n_{n}_eps_{alt_eps}_b.csv", delimiter=",", dtype=float)
+        learning_curve: List[Tuple[float, float]] = [(el[0], el[1]) for el in arr]
+        learning_curves.append(learning_curve)
+        legends.append(f"N={n}, eps={eps}")
+        plot_Q_mean_and_stderr(datasets=learning_curves, data_legends=legends, fname_suffix='game_b')
     
 
 
