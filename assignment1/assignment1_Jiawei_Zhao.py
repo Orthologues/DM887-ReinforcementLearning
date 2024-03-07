@@ -7,7 +7,7 @@ from random import choices
 from math import pow, floor
 from matplotlib import pyplot as plt
 from re import sub
-from multiprocessing import Pool
+
 
 """
 Author: Jiawei Zhao
@@ -95,11 +95,11 @@ Repeat the whole training process ten times.
 
 eps_list = [0.1, 0.2, 0.3]
 n_list = [1, 2, 3]
-n_eps_pairs = [(n, eps) for eps in eps_list for n in n_list]
+n_eps_pairs = [(n, eps) for eps in eps_list for n in n_list ]
 
 class Q_learning_trainer():
 
-    def __init__(self, env: GridWorld, epsilon=0.05, n_step=1, alpha=0.1, gamma=0.9, max_round=10, max_episode=200, plotting_n_step=5):
+    def __init__(self, env: GridWorld, epsilon, n_step, alpha=0.8, gamma=0.9, max_round=10, max_episode=500, plotting_n_step=5):
         np.random.seed(42)
         self.env = env
         self.n_step = n_step
@@ -109,16 +109,12 @@ class Q_learning_trainer():
         self.max_round = max_round
         self.max_episode = max_episode # the criterion for convergence of the Q-table
         self.plotting_n_step = plotting_n_step
-        self.Q_sa_sum = np.zeros(shape=(max_round, floor(max_episode/plotting_n_step)))
+        self.Q_mean = np.zeros(shape=(max_round, floor(max_episode/plotting_n_step)))
         self.states_to_coords: List[Tuple[int, int]] = list(env.state_dict.keys())
         self.coords_to_states: Dict[Tuple[int, int], int] = {coord: index for index, coord in enumerate(self.states_to_coords)}
         self.viable_actions: Dict[int, Set[int]] = dict()
         # Q-table that tracks the expected future costs to be minimized, so the initial values are set to be very large
-        self.Q_sa: np.ndarray[float] = np.random.rand(self.env.state_count, self.env.action_size) * 100
-        # let the Q-values and V-values at terminal states to be 0
-        for s in range(env.state_count):
-            if env.state_dict[self.states_to_coords[s]]['done']:
-                self.Q_sa[s, :] = 0
+        self.Q_sa: np.ndarray[float] = np.full((self.env.state_count, self.env.action_size), 1000) + np.random.normal(0, 5, (self.env.state_count, self.env.action_size))
         self.pi = np.zeros(shape=self.env.state_count)
         self.initialize_random_policies()
 
@@ -154,7 +150,8 @@ class Q_learning_trainer():
         T = np.inf # total time step of the episode
         while True:
             if t < T:
-                action = self.choose_action_by_greedy_epsilon(state)
+                # if t exceeds 1000, the agent is considered as being trapped in a circular path that never reaches a terminal state
+                action = self.choose_action_by_greedy_epsilon(state) if t < 1000 else np.random.choice(list(self.viable_actions[state]))
                 next_state = self.get_next_state(state, action)
 
                 if self.env.state_dict[self.states_to_coords[next_state]]['done']:
@@ -207,17 +204,13 @@ class Q_learning_trainer():
     def reset_training(self):
         np.random.seed(42)
         # Q-table that tracks the expected future costs to be minimized, so the initial values are set to be very large
-        self.Q_sa: np.ndarray[float] = np.random.rand(self.env.state_count, self.env.action_size) * 100
-        # let the Q-values and V-values at terminal states to be 0
-        for s in range(self.env.state_count):
-            if self.env.state_dict[self.states_to_coords[s]]['done']:
-                self.Q_sa[s, :] = 0
+        self.Q_sa: np.ndarray[float] = np.full((self.env.state_count, self.env.action_size), 1000) + np.random.normal(0, 5, (self.env.state_count, self.env.action_size))
         self.pi = np.zeros(shape=self.env.state_count)
         self.initialize_random_policies()
 
 
-    def reset_Q_sum_array(self):
-        self.Q_sa_sum = np.zeros(shape=(self.max_round, floor(self.max_episode/self.plotting_n_step)))
+    def reset_Q_array(self):
+        self.Q_mean = np.zeros(shape=(self.max_round, floor(self.max_episode/self.plotting_n_step)))
 
 
     def get_next_state(self, state: int, action: int) -> int:
@@ -245,10 +238,9 @@ class Q_learning_trainer():
         return -self.env.state_dict[self.states_to_coords[state]]['reward']
 
 
-    def update_Q_sum(self, round: int, episode: int):
-        if episode % self.plotting_n_step == 0:
-            self.Q_sa_sum[round-1, int(episode/self.plotting_n_step)-1] = np.sum(self.Q_sa)
-
+    def update_Q(self, round: int, episode: int):
+        if (episode-1) % self.plotting_n_step == 0:
+            self.Q_mean[round-1, int(episode/self.plotting_n_step)] = np.mean(self.Q_sa)
 
     def get_n_step_delta(self, state: int, action: int, next_state: int, tau: int, T: int) -> float:
         G = 0
@@ -270,19 +262,32 @@ class Q_learning_trainer():
         for round in range(1, self.max_round+1):
             self.reset_training()
             for e in range(1, self.max_episode+1):
-                print(f"checkpoint: episode {e}")
+                #print(f"N={self.n_step}, eps={self.epsilon}, Episode {e}")
                 self.run_episode(initial_s=0)
-                self.update_Q_sum(round, episode=e)
+                self.update_Q(round, episode=e)
         
         mean_stderr_dataset: List[Tuple[float, float]] = []
-        averaged_Q_sum = np.mean(self.Q_sa_sum, axis=0)
-        stderr_Q_sum = np.std(self.Q_sa_sum, axis=0)/np.sqrt(self.Q_sa_sum.shape[0])
-        for (mean, stderr) in zip(averaged_Q_sum, stderr_Q_sum):
+        averaged_Q = np.mean(self.Q_mean, axis=0)
+        stderr_Q = np.std(self.Q_mean, axis=0)/np.sqrt(self.Q_mean.shape[0])
+        for (mean, stderr) in zip(averaged_Q, stderr_Q):
             mean_stderr_dataset.append((mean, stderr))
 
-        self.reset_Q_sum_array()
+        self.reset_Q_array()
 
         return mean_stderr_dataset
+
+
+def run_game(env, game_name, n, eps):
+    learner = Q_learning_trainer(env, n_step=n, epsilon=eps)
+    mean_stderr_dataset: List[Tuple[float, float]] = []    
+    mean_stderr_dataset = learner.run_N_step_Q_learning()
+    alt_eps = sub("\.", "-", str(eps))
+    file_prefix = f"n_{n}_eps_{alt_eps}_{game_name}"
+    np.savetxt(f"{file_prefix}.csv",
+        mean_stderr_dataset,
+        delimiter =", ",
+        fmt ='% s')
+    #plot_Q_mean_and_stderr(datasets=mean_stderr_datasets, data_legends=data_legends, fname_suffix="GameA")
 
 
 # the plotting function 
@@ -315,22 +320,7 @@ def plot_Q_mean_and_stderr(datasets: List[List[Tuple[float, float]]], data_legen
     # Add legend
     ax.legend(data_legends, loc="upper right")
 
-    fig.savefig(f"learning-curve-{fname_suffix}.png", dpi=150, bbox_inches='tight')
-
-def run_game(env, game_name, n, eps):
-    learner = Q_learning_trainer(env)
-    mean_stderr_dataset: List[Tuple[float, float]] = []    
-    learner.set_epsilon(eps)
-    learner.set_n_step(n)
-    mean_stderr_dataset = learner.run_N_step_Q_learning()
-    alt_eps = sub("\.", "-", str(eps))
-    file_prefix = f"n_{n}_eps_{alt_eps}_{game_name}"
-    np.savetxt(f"{file_prefix}.csv",
-        mean_stderr_dataset,
-        delimiter =", ",
-        fmt ='% s')
-    
-    #plot_Q_mean_and_stderr(datasets=mean_stderr_datasets, data_legends=data_legends, fname_suffix="GameA")
+    fig.savefig(f"learning-curve-{fname_suffix}.png", dpi=150, bbox_inches='tight')    
 
 
 # run training and plotting at the main function
@@ -341,7 +331,6 @@ if __name__ == "__main__":
     for n, eps in n_eps_pairs:
         run_game(env_a, "a", n, eps)
         run_game(env_b, "b", n, eps)
-        print(f"n: {n}, eps: {eps}")
     
 
     
