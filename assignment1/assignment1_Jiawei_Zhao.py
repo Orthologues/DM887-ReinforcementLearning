@@ -6,7 +6,8 @@ import numpy as np
 from random import choices
 from math import pow, floor
 from matplotlib import pyplot as plt
-
+from re import sub
+from multiprocessing import Pool
 
 """
 Author: Jiawei Zhao
@@ -25,19 +26,19 @@ Game B needs to fulfill the following requirements:
 GRID_A: str=\
     """
     wwwwwwwwwwwwwwwwwwww
-    wa    o  w      o  w
+    wa       w         w
     w        w         w
-    www     www      www
+    www     www  o   www
     w                  w
     w             o    w
     w                  w
     w             o    w
-    w o     wwwww      w
+    w       wwwww      w
     w         w    o   w
     w         w        w
     w         w        w
     w                  w
-    w                  w
+    w            o     w
     w        o         w
     wwww             www
     w          w       w
@@ -91,9 +92,15 @@ Q2. [7 points] Train the learning agent using N-step Q-learning for N=1, 2, 3
 in tabular form that uses an epsilon-greedy behavior policy with epsilon=0.1, 0.2, 0.3.
 Repeat the whole training process ten times.
 """
+
+eps_list = [0.1, 0.2, 0.3]
+n_list = [1, 2, 3]
+n_eps_pairs = [(n, eps) for eps in eps_list for n in n_list]
+
 class Q_learning_trainer():
 
-    def __init__(self, env: GridWorld, epsilon=0.05, n_step=1, alpha=0.1, gamma=0.9, max_round=10, max_episode=5000, plotting_n_step=5):
+    def __init__(self, env: GridWorld, epsilon=0.05, n_step=1, alpha=0.1, gamma=0.9, max_round=10, max_episode=200, plotting_n_step=5):
+        np.random.seed(42)
         self.env = env
         self.n_step = n_step
         self.gamma = gamma
@@ -102,25 +109,18 @@ class Q_learning_trainer():
         self.max_round = max_round
         self.max_episode = max_episode # the criterion for convergence of the Q-table
         self.plotting_n_step = plotting_n_step
-        # tracking the count of time steps per episode
-        self.time_step = 0
-        # represents the optimal (minimum) expected cumulative cost given a state
-        self.V_s: np.ndarray[Union[int, float]] = np.full((env.state_count), pow(10, 3)) 
-        # Q-table that tracks the expected future costs to be minimized, so the initial values are set to be very large
-        self.Q_sa: np.ndarray[float] = np.full((env.state_count, env.action_size), pow(10, 3)) 
-        self.S_A_R: List[Tuple[int, int, int]] = []
-        # tracking the behaviour policies
         self.Q_sa_sum = np.zeros(shape=(max_round, floor(max_episode/plotting_n_step)))
-        self.pi = np.zeros(shape=env.state_count)
         self.states_to_coords: List[Tuple[int, int]] = list(env.state_dict.keys())
         self.coords_to_states: Dict[Tuple[int, int], int] = {coord: index for index, coord in enumerate(self.states_to_coords)}
         self.viable_actions: Dict[int, Set[int]] = dict()
+        # Q-table that tracks the expected future costs to be minimized, so the initial values are set to be very large
+        self.Q_sa: np.ndarray[float] = np.random.rand(self.env.state_count, self.env.action_size) * 100
         # let the Q-values and V-values at terminal states to be 0
         for s in range(env.state_count):
             if env.state_dict[self.states_to_coords[s]]['done']:
                 self.Q_sa[s, :] = 0
-                self.V_s[s] = 0
-
+        self.pi = np.zeros(shape=self.env.state_count)
+        self.initialize_random_policies()
 
     def initialize_random_policies(self):
         for s in range(self.env.state_count):
@@ -134,7 +134,7 @@ class Q_learning_trainer():
             self.viable_actions[s] = viable_a
     
 
-    def choose_action_by_epsilon_greedy(self, state: int) -> int:
+    def choose_action_by_greedy_epsilon(self, state: int) -> int:
         # create a probability dictionary using epsilon-greedy behavior policy  
         prob_dict: Dict[int, float] = dict()
         viable_a = self.viable_actions[state]
@@ -148,22 +148,32 @@ class Q_learning_trainer():
         return choices(list(prob_dict.keys()), weights=list(prob_dict.values()), k=1)[0]
 
 
-    def run_episode(self, initial_s: int, episode: int):
-        if episode == 1:
-            self.initialize_random_policies()
+    def run_episode(self, initial_s: int):
         state = initial_s
+        t = 0 # time_step
+        T = np.inf # total time step of the episode
         while True:
-            if self.env.state_dict[self.states_to_coords[state]]['done']:
+            if t < T:
+                action = self.choose_action_by_greedy_epsilon(state)
+                next_state = self.get_next_state(state, action)
+
+                if self.env.state_dict[self.states_to_coords[next_state]]['done']:
+                    T = t+1
+            
+            tau = t - self.n_step + 1 # represents the time step whose state's Q is being updated
+            
+            # update Q table using self.n_step
+            if tau >= 0:
+                delta = self.get_n_step_delta(state, action, next_state, tau, T)
+                self.Q_sa[state, action] += self.alpha * delta
+                self.pi[state] = np.argmin(self.Q_sa[state, ])
+            
+            if tau == T-1:
                 break
-            # create a probability dictionary using epsilon-greedy behavior policy  
-            action = self.choose_action_by_epsilon_greedy(state)
-            next_state = self.get_next_state(state, action)                
-            self.update_Q_table(state, action)
-            self.update_V()
-            self.update_pi()
-            self.S_A_R.append((state, action, self.get_immediate_cost(state)))
+            
             state = next_state
-            self.time_step += 1
+            t += 1                
+
 
 
     def set_alpha(self, alpha: float):
@@ -194,20 +204,16 @@ class Q_learning_trainer():
         self.max_episode = max_episode
 
 
-    def reset_new_episode(self):
-        self.time_step = 0
-
-
     def reset_training(self):
         np.random.seed(42)
-        self.Q_sa: np.ndarray[float] = np.full((self.env.state_count, self.env.action_size), pow(10, 3)) 
+        # Q-table that tracks the expected future costs to be minimized, so the initial values are set to be very large
+        self.Q_sa: np.ndarray[float] = np.random.rand(self.env.state_count, self.env.action_size) * 100
         # let the Q-values and V-values at terminal states to be 0
         for s in range(self.env.state_count):
             if self.env.state_dict[self.states_to_coords[s]]['done']:
                 self.Q_sa[s, :] = 0
-                self.V_s[s] = 0
-        self.V_s = np.full((self.env.state_count), pow(10, 3)) 
-        self.pi = np.random.choice(self.env.action_values, size=self.env.state_count)
+        self.pi = np.zeros(shape=self.env.state_count)
+        self.initialize_random_policies()
 
 
     def reset_Q_sum_array(self):
@@ -239,47 +245,34 @@ class Q_learning_trainer():
         return -self.env.state_dict[self.states_to_coords[state]]['reward']
 
 
-    def update_pi(self, s: int):
-        # base it on the epsilon-greedy policy
-        self.pi[s] = np.argmin(self.Q_sa[s, ])
-
-    
-    def update_V(self, s: int):
-        self.V_s[s] = np.min(self.Q_sa[s, ])
-
-
     def update_Q_sum(self, round: int, episode: int):
         if episode % self.plotting_n_step == 0:
-            self.Q_sa_sum[round-1, episode-1] = np.sum(self.Q_sa)
+            self.Q_sa_sum[round-1, int(episode/self.plotting_n_step)-1] = np.sum(self.Q_sa)
 
 
-    def get_n_returns(self, state: int) -> float:
-        g = 0
-        for k in range(0, self.n_step):
-            next_state = self.get_next_state(state, self.pi[state])
-            if self.env.state_dict[self.states_to_coords[next_state]]['done']:
-                g += pow(self.gamma, k) * self.get_immediate_cost(next_state)
+    def get_n_step_delta(self, state: int, action: int, next_state: int, tau: int, T: int) -> float:
+        G = 0
+        s = next_state
+        for i in range(tau+1, min(tau+self.n_step+1, T)):
+            cost = self.get_immediate_cost(s)
+            G += pow(self.gamma, i-tau-1) * cost
+            eps_greedy_a = self.choose_action_by_greedy_epsilon(s)
+            s = self.get_next_state(s, eps_greedy_a)
 
-
-    def update_Q_table(self, state: int, action: int):
-        coord = self.states_to_coords[state]
-        if self.env.state_dict[coord]['done']:
-             g = self.get_immediate_cost(state)
-             self.Q_sa[state, action] += self.alpha * (g - self.Q_sa[state, action])
-        # calculate the expected future costs g (self.G_t)
-        else:
-            # infer the state after N time steps given a state and the recently updated policy
-            g = self.get_n_returns[state]
-            self.Q_sa[state, action] += self.alpha * (g - self.Q_sa[state, action])
-
+        if tau+self.n_step < T:
+            # we use the cost function here, so np.min is chosen instead of np.max
+            G += pow(self.gamma, self.n_step) * np.min(self.Q_sa[s, ])
+        
+        return G - self.Q_sa[state, action]
+    
 
     def run_N_step_Q_learning(self) -> List[Tuple[float, float]]:
         for round in range(1, self.max_round+1):
             self.reset_training()
             for e in range(1, self.max_episode+1):
-                self.reset_new_episode()
-                self.run_episode(initial_s=0, episode=e)
-                self.update_Q_sum(round, e)
+                print(f"checkpoint: episode {e}")
+                self.run_episode(initial_s=0)
+                self.update_Q_sum(round, episode=e)
         
         mean_stderr_dataset: List[Tuple[float, float]] = []
         averaged_Q_sum = np.mean(self.Q_sa_sum, axis=0)
@@ -324,37 +317,34 @@ def plot_Q_mean_and_stderr(datasets: List[List[Tuple[float, float]]], data_legen
 
     fig.savefig(f"learning-curve-{fname_suffix}.png", dpi=150, bbox_inches='tight')
 
+def run_game(env, game_name, n, eps):
+    learner = Q_learning_trainer(env)
+    mean_stderr_dataset: List[Tuple[float, float]] = []    
+    learner.set_epsilon(eps)
+    learner.set_n_step(n)
+    mean_stderr_dataset = learner.run_N_step_Q_learning()
+    alt_eps = sub("\.", "-", str(eps))
+    file_prefix = f"n_{n}_eps_{alt_eps}_{game_name}"
+    np.savetxt(f"{file_prefix}.csv",
+        mean_stderr_dataset,
+        delimiter =", ",
+        fmt ='% s')
+    
+    #plot_Q_mean_and_stderr(datasets=mean_stderr_datasets, data_legends=data_legends, fname_suffix="GameA")
 
 
 # run training and plotting at the main function
 if __name__ == "__main__":
 
-    eps_list = [0.1, 0.2, 0.3]
-    N_list = [1, 2, 3]
-
     env_a, env_b = define_two_grid_worlds()
 
-    learner_a = Q_learning_trainer(env=env_a)
-    mean_stderr_datasets: List[List[Tuple[float, float]]] = []
-    data_legends: List[str] = []
-    for N in N_list:
-        for eps in eps_list:
-            learner_a.set_epsilon(eps)
-            learner_a.set_n_step(N)
-            mean_stderr_dataset = learner_a.run_N_step_Q_learning()
-            mean_stderr_datasets.append(mean_stderr_dataset)
-            data_legends.append(f"N={N}, eps={eps}")
-    plot_Q_mean_and_stderr(datasets=mean_stderr_datasets, data_legends=data_legends, fname_suffix="GameA")
+    for n, eps in n_eps_pairs:
+        run_game(env_a, "a", n, eps)
+        run_game(env_b, "b", n, eps)
+        print(f"n: {n}, eps: {eps}")
+    
+
+    
 
 
-    learner_b = Q_learning_trainer(env=env_b)
-    mean_stderr_datasets = []
-    data_legends = []
-    for N in N_list:
-        for eps in eps_list:
-            learner_b.set_epsilon(eps)
-            learner_b.set_n_step(N)
-            mean_stderr_dataset = learner_b.run_N_step_Q_learning()
-            mean_stderr_datasets.append(mean_stderr_dataset)
-            data_legends.append(f"N={N}, eps={eps}")
-    plot_Q_mean_and_stderr(datasets=mean_stderr_datasets, data_legends=data_legends, fname_suffix="GameB")
+    

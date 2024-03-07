@@ -7,7 +7,7 @@ Date: 28.02.2024
 Steps: 
 1) Create a GridWorld environment of size 10x10 or bigger.
 
-2) Initialize your value function to an arbitrarily large value, e.g. J(x) = +pow(10, 6) for all x if you store returnss, J(x) = -pow(10, 6) if you store rewards.
+2) Initialize your value function to an arbitrarily large value, e.g. J(x) = +inf for all x if you store costs, J(x) = -inf if you store rewards.
 
 3) Perform policy evaluation by implementing two versions of Monte Carlo simulation: a) First-visit, b) Every-visit. Define a convergence criterion, e.g. an epsilon tolerance below which the value of a state is not counted as changed, and run the algorithm until this condition is satisfied. Count how many samples you have taken and how many simulation rounds you have started.
 
@@ -132,6 +132,7 @@ class Monte_Carlo_learner:
                 prob_dict[a] = self.epsilon/size_a
         # choose the updated policy using the probability list
         return choices(list(prob_dict.keys()), weights=list(prob_dict.values()), k=1)[0]
+        
     
     def generate_episode(self):
         if self.episode == 0:
