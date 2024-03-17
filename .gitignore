@@ -3,3 +3,8 @@
 GridWorld/
 !GridWorld/exer1_grid_env.py
 .vscode/
+*.fls
+*.aux
+*.fdb_latexmk
+*.log
+*.synctex.gz
