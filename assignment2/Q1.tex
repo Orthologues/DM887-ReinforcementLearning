@@ -1,21 +1,103 @@
-\documentclass{article}
-\usepackage{algorithm}
+\documentclass[a4paper,12pt,oneside]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{amsthm}
+\DeclareMathOperator{\argmax}{arg,max}
+\DeclareMathOperator{\argmin}{arg,min}
+\setlength\parindent{0pt}
+\setlength{\topmargin}{-2cm}
+\setlength{\textheight}{24cm}
+
+\hoffset= -70pt
+\textwidth=540pt
+\numberwithin{equation}{section}
+
 \usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{xcolor}
+\usepackage{lmodern} % Load a font package
+
 
 \begin{document}
 
-\begin{algorithm}
-    \caption{Least Squares Temporal Differences (LSTD) Deep Q-Learning with Nonlinear Feature Extraction}
-    \begin{algorithmic}[1]
-        \State Initialize Q-network weights \(w\)
-        \State Initialize feature extraction network weights \(\theta\)
-        \State Initialize replay buffer \(D\)
-        
-        \For{\(episode = 1\) to \(N\)}
-            \State Initialize state \(S\)
-            \Comment{Your Q-learning algorithm steps go here}
+\title{DM887 Assignment2 Q1}
+\author{Jiawei Zhao}
+\date{19.03.2024}
+\maketitle
+\newcommand{\mycomment}[1]{{\fontfamily{lmss}\selectfont\textcolor{blue}{[#1]}}} % Sans-serif and blue
+    \begin{algorithm}
+    \caption {Least-Squares Temporal Differences (LSTD) Deep Q-Learning with Nonlinear Feature Extraction that maps a state to lower-dimensional latent embedding. While the action-value function should be a linear function of the output of the feature extractor.}
+        \begin{algorithmic}[1]
+        \State Initialize a variational autoencoder $\mathbf{A}$ as the feature extraction network with initial weights $\theta_0$ 
+        \mycomment {$\theta_0$ are drawn from a zero-mean Gaussian distribution}
+        \State Initialize the number of maximum episode \(N_0\) = 10, \(N_1\) = 10, and \(N_2\) = 30 for each phase of training
+        \mycomment {It would be a wise choice to seperate the warm-up phase, the antoencoder improvement phase, and the LSTD improvement phase}
+        \mycomment {Initialization of training hyperparameters}
+        \State Initialize the number of maximum time step per episode \(t\) = 5000
+        \State Initialize the weights \(w_0\) for linear approximation of the action-value function \(y = f(phi(s))\) which will be used for LSTD
+        \State Initialize a replay memory buffer $\mathcal{D}$ with a capacity \(N = t (N_0 + N_1 + N_2)\)
+        \State Initialize a discount factor $\gamma=0.9$ 
+        \mycomment{A relatively large discount factor encourages long-term planning and faster convergence during training}
+        \clearpage
+        \mycomment {The warm-up phase starts here}
+        \State Freeze the weights of $\mathbf{A}$ as $\theta_0$
+        \State Freeze the weights of the \(f(phi(s))\) as \(w_0\)
+        \For {\(episode\) \(e = 1\) to \(N_0\)}
+            \State Initialize state \(s_0\) 
+            \State Preprocess \(s\) into \(s_1\) to adapt it as input of $\mathbf{A}$
+            \mycomment{preprocessing of high-dimensional states is necessary w.r.t. autoenconders}
+            \For {each time step \(t\) = 1 to \(T\)}
+                \State Encode state \(s_t\) using $\mathbf{A}$ to get latent embedding $\phi(s_t)$
+                \State Select action $a_t$ using $\epsilon$-greedy policy with $\epsilon=0.3$
+                \mycomment{The learning curves of Game B of Assignment 1 corroborate that a relatively high $\epsilon$ could improve \(Q\) more efficiently when an \(e\) does not end prematurely in the majority of cases}
+                \State Execute $a_t$ and obtain reward $r_t$ and new state $s_{t+1}$
+                \State Store the transition of the current \(t\), i.e. $(s_t, a_t, r_t, s_{t+1})$ in $\mathcal{D}$
+                \State Encode state \(s_t\) using $\mathbf{A}$ to get latent embedding $\phi(s_t)$
+                \State Select action $a_t$ using $\epsilon$-greedy policy with $\epsilon=0.3$
+                \mycomment{The learning curves of Game B of Assignment 1 corroborate that a relatively high $\epsilon$ could improve \(Q\) more efficiently when an \(e\) does not end prematurely in the majority of cases}
+                \State Execute $a_t$ and obtain reward $r_t$ and new state $s_{t+1}$
+                \State Store the transition of the current \(t\), i.e. $(s_t, a_t, r_t, s_{t+1})$ in $\mathcal{D}$
+            \EndFor
         \EndFor
-    \end{algorithmic}
-\end{algorithm}
+        \end{algorithmic}[1]
+    \end{algorithm}
+    
+    \clearpage
+    \begin{algorithm}
+    \caption{The LSTD update starts here}
+        \begin{algorithmic}[1]
+        \State Unfreeze the weights of $\mathbf{A}$, i.e. $\theta$
+        \For {\(episode\) \(e = 1\) to \(N_1\)}
+            \State Repeat the same steps at phase 1
+            \For {each time step \(t\) = 1 to \(T\)}
+                \State Repeat the same steps at phase 1
+                \\
+                \mycomment{Start using the autoencoder algorithm to update \(w\)}
+                \State Sample a minibatch of transitions from $\mathcal{D}$ with a batchsize with a randomly selected  \
+
+            \EndFor
+        \EndFor
+        \end{algorithmic}[1]
+    \end{algorithm}
+
+    \clearpage
+    \begin{algorithm}
+    \caption{The autoencoder + LSTD training starts here}
+        \begin{algorithmic}[1]
+        \State Freeze the weights of $\mathbf{A}$, i.e. $\theta$
+        \State Unfreeze the weights of \(f(phi(s))\)
+        \For {\(episode\) \(e = 1\) to \(N_2\)}
+            \State Repeat the same steps at phase 1
+            \For {each time step \(t\) = 1 to \(T\)}
+                \State Repeat the same steps at phase 1
+                \\
+                \mycomment{Start using the online LSTD algorithm to update \(w\)}
+                \State Sample a minibatch of transitions from $\mathcal{D}$ with a batchsize \
+            \EndFor
+        \EndFor
+        \end{algorithmic}[1]    
+    \end{algorithm}
+
 
 \end{document}
