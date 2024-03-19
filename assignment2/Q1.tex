@@ -38,6 +38,7 @@
         \State Initialize the weights \(w_0\) for linear approximation of the action-value function \(y = f(phi(s))\) which will be used for LSTD
         \State Initialize a replay memory buffer $\mathcal{D}$ with a capacity \(N = t (N_0 + N_1 + N_2)\)
         \State Initialize a discount factor $\gamma=0.9$ 
+        \State Initialize the minibatch size of DQL as \(k=32\) 
         \mycomment{A relatively large discount factor encourages long-term planning and faster convergence during training}
         \clearpage
         \mycomment {The warm-up phase starts here}
@@ -67,13 +68,14 @@
     \begin{algorithm}
     \caption{The LSTD update starts here}
         \begin{algorithmic}[1]
-        \State Unfreeze the weights of $\mathbf{A}$, i.e. $\theta$
+        \State Freeze the weights of $\mathbf{A}$ as $\theta_0$
+        \State Unfreeze the weights of \(f(phi(s))\), i.e. \(w\)
         \For {\(episode\) \(e = 1\) to \(N_1\)}
             \State Repeat the same steps at phase 1
             \For {each time step \(t\) = 1 to \(T\)}
                 \State Repeat the same steps at phase 1
                 \\
-                \mycomment{Start using the autoencoder algorithm to update \(w\)}
+                \mycomment{Start using the LSTD algorithm to update \(w\)}
                 \State Sample a minibatch of transitions from $\mathcal{D}$ with a batchsize with a randomly selected  \
 
             \EndFor
@@ -85,8 +87,7 @@
     \begin{algorithm}
     \caption{The autoencoder + LSTD training starts here}
         \begin{algorithmic}[1]
-        \State Freeze the weights of $\mathbf{A}$, i.e. $\theta$
-        \State Unfreeze the weights of \(f(phi(s))\)
+        \State Unfreeze the weights of $\mathbf{A}$, i.e. $\theta$
         \For {\(episode\) \(e = 1\) to \(N_2\)}
             \State Repeat the same steps at phase 1
             \For {each time step \(t\) = 1 to \(T\)}
