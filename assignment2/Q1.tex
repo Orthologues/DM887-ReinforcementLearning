@@ -25,28 +25,40 @@
 \author{Jiawei Zhao}
 \date{19.03.2024}
 \maketitle
+\title {Implementation of Least-Squares Temporal Differences (LSTD) Deep Q-Learning with Nonlinear Feature Extraction that maps a state to lower-dimensional latent embedding. While the action-value function should be a linear function of the output of the feature extractor.}
+
 \newcommand{\mycomment}[1]{{\fontfamily{lmss}\selectfont\textcolor{blue}{[#1]}}} % Sans-serif and blue
     \begin{algorithm}
-    \caption {Least-Squares Temporal Differences (LSTD) Deep Q-Learning with Nonlinear Feature Extraction that maps a state to lower-dimensional latent embedding. While the action-value function should be a linear function of the output of the feature extractor.}
         \begin{algorithmic}[1]
-        \State Initialize a variational autoencoder $\mathbf{A}$ as the feature extraction network with initial weights $\theta_0$ 
-        \mycomment {$\theta_0$ are drawn from a zero-mean Gaussian distribution}
-        \State Initialize the number of maximum episode \(N_0\) = 10, \(N_1\) = 10, and \(N_2\) = 30 for each phase of training
-        \mycomment {It would be a wise choice to seperate the warm-up phase, the antoencoder improvement phase, and the LSTD improvement phase}
+        \caption{Initialization}
+        \State Initialize a variational autoencoder $\mathbf{A}$ as the feature extraction network with initial weights \(w_0\)
+        \State Initialize the learning rate of $\mathbf{A}$ as $\alpha=1 \times 10^{-3}$ 
+        \mycomment {\(w_0\) are drawn from Glorot uniform initialization}
+        \State Initialize the minibatch size of DQN as \(k=32\) 
+        \State Initialize the total number of training episodes \(N\) = 110, and the number of episodes at each seperate phase of training \(N_0\) = 10
+        \mycomment {It would be a wise choice to seperate the warm-up phase, the antoencoder update phase, and the LSTD update phase}
+        \\
         \mycomment {Initialization of training hyperparameters}
-        \State Initialize the number of maximum time step per episode \(t\) = 5000
-        \State Initialize the weights \(w_0\) for linear approximation of the action-value function \(y = f(phi(s))\) which will be used for LSTD
-        \State Initialize a replay memory buffer $\mathcal{D}$ with a capacity \(N = t (N_0 + N_1 + N_2)\)
+        \State Initialize the number of maximum time step per episode \(T\) = 5000
+        \State Initialize the weights $\theta_0$ for linear approximation function $y = f(phi(s))$ which will be used for LSTD
+        \mycomment {\(w_0\) are drawn from a zero-mean Gaussian distribution with $\sigma=1$ and a fixed seed $42$}
+        \State Initialize a replay memory buffer $\mathcal{D}$ with a capacity \(N \times T\)
         \State Initialize a discount factor $\gamma=0.9$ 
-        \State Initialize the minibatch size of DQL as \(k=32\) 
+        \State Initialize a small constant $\lambda=1 \times 10^{-4}$ to initialize $A^{-1}$ for LSTD  
+        \State Add global variables $A^{-1} = \lambda^{-1}I$ and $b=0$ to store the tensors that suffice $\theta_t = A_t^{-1} b_t$ at each time step \(t\)
         \mycomment{A relatively large discount factor encourages long-term planning and faster convergence during training}
-        \clearpage
-        \mycomment {The warm-up phase starts here}
-        \State Freeze the weights of $\mathbf{A}$ as $\theta_0$
-        \State Freeze the weights of the \(f(phi(s))\) as \(w_0\)
+        \end{algorithmic}[1]
+    \end{algorithm}
+        
+    \clearpage
+    \begin{algorithm}
+    \caption{Warm-up phase}
+        \begin{algorithmic}[1]
+        \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
+        \State Freeze the weights of $\mathbf{A}$, i.e. \(w\)
         \For {\(episode\) \(e = 1\) to \(N_0\)}
-            \State Initialize state \(s_0\) 
-            \State Preprocess \(s\) into \(s_1\) to adapt it as input of $\mathbf{A}$
+            \State Initialize state \(s\) 
+            \State Preprocess \(s\) into \(s_0\) to adapt it as input of $\mathbf{A}$
             \mycomment{preprocessing of high-dimensional states is necessary w.r.t. autoenconders}
             \For {each time step \(t\) = 1 to \(T\)}
                 \State Encode state \(s_t\) using $\mathbf{A}$ to get latent embedding $\phi(s_t)$
@@ -66,18 +78,22 @@
     
     \clearpage
     \begin{algorithm}
-    \caption{The LSTD update starts here}
+    \caption{Autoencoder update phase}
         \begin{algorithmic}[1]
-        \State Freeze the weights of $\mathbf{A}$ as $\theta_0$
-        \State Unfreeze the weights of \(f(phi(s))\), i.e. \(w\)
-        \For {\(episode\) \(e = 1\) to \(N_1\)}
-            \State Repeat the same steps at phase 1
+        \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
+        \State Unfreeze the weights of $\mathbf{A}$, i.e. \(w\)
+        \State Initialize an Adam optimizer \(o\) with a learning rate $\alpha$ for $\mathbf{A}$
+        \For {\(episode\) \(e = 1\) to \(N_0\)}
+            \State Repeat the same steps at the warm-up phase
             \For {each time step \(t\) = 1 to \(T\)}
-                \State Repeat the same steps at phase 1
+                \State Repeat the same steps at the warm-up phase
                 \\
-                \mycomment{Start using the LSTD algorithm to update \(w\)}
-                \State Sample a minibatch of transitions from $\mathcal{D}$ with a batchsize with a randomly selected  \
-
+                \mycomment{Start updating the autoencoder using minibatches}
+                \State Sample a minibatch of transitions \(d\) from $\mathcal{D}$ with a batchsize \(k\) \
+                \State Use the \(s'\) of \(d\) as input to $\mathbf{A}$
+                \State First encode, then decode \(d\) using $\mathbf{A}$
+                \State Calculate the loss \(L\) of \(s'\) by comparing the input and output of $\mathbf{A}$
+                \State Update \(w\) with \(o\) as per \(L\)
             \EndFor
         \EndFor
         \end{algorithmic}[1]
@@ -85,20 +101,41 @@
 
     \clearpage
     \begin{algorithm}
-    \caption{The autoencoder + LSTD training starts here}
+    \caption{LSTD update phase}
         \begin{algorithmic}[1]
-        \State Unfreeze the weights of $\mathbf{A}$, i.e. $\theta$
-        \For {\(episode\) \(e = 1\) to \(N_2\)}
-            \State Repeat the same steps at phase 1
+            \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
+            \State Unfreeze the weights of $\mathbf{A}$, i.e. \(w\)
+        \For {\(episode\) \(e = 1\) to \(N_0\)}
+            \State Repeat the same steps at the warm-up phase
             \For {each time step \(t\) = 1 to \(T\)}
-                \State Repeat the same steps at phase 1
+                \State Repeat the same steps at the warm-up phase
                 \\
-                \mycomment{Start using the online LSTD algorithm to update \(w\)}
-                \State Sample a minibatch of transitions from $\mathcal{D}$ with a batchsize \
+                \mycomment{Start using the online LSTD algorithm to update $\theta$}
+                \State Calculate $\tau = \phi(s_t) - \gamma \phi(s_{t+1})$
+                \State Calculate $v = \tau^{T} A^{-1}$
+                \State Update $A^{-1} = A^{-1} - \frac{A^{-1} \phi(i) v^{T}}{1 + v \phi(s)}$
+                \State Update $b = b + r \phi(s)$
+                \State Update state $s=s'$
             \EndFor
         \EndFor
         \end{algorithmic}[1]    
     \end{algorithm}
 
 
+    \clearpage
+    \begin{algorithm}
+        \caption{Training procedure}
+        \begin{algorithmic}[1]
+        \State Run \(Initialization\)
+        \State Run \(\textit{Warm-up phase}\)
+        \While {\(episode\) $e \leq N$}
+            \State Run \(\textit{Autoencoder update phase}\)
+            \State $e=e+N_0$
+            \State Run \(\textit{LSTD update phase}\)
+            \State $e=e+N_0$
+        \EndWhile
+        \end{algorithmic}[1]    
+    \end{algorithm}
+    
+    
 \end{document}

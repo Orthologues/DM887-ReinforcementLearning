@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import torch
-from Q2 import LSTD_DQL_trainer
+from Q2 import LSTD_DQL_learner
 
 """
 Author: Jiawei Zhao
