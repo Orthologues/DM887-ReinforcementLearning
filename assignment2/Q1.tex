@@ -65,6 +65,9 @@
                 \State Select action $a_t$ using $\epsilon$-greedy policy with $\epsilon=0.3$
                 \mycomment{The learning curves of Game B of Assignment 1 corroborate that a relatively high $\epsilon$ could improve \(Q\) more efficiently when an \(e\) does not end prematurely in the majority of cases}
                 \State Execute $a_t$ and obtain reward $r_t$ and new state $s_{t+1}$
+                \If{$s_{t+1} \notin S$}
+                    \State \textbf{break}
+                \EndIf
                 \State Store the transition of the current \(t\), i.e. $(s_t, a_t, r_t, s_{t+1})$ in $\mathcal{D}$
                 \State Encode state \(s_t\) using $\mathbf{A}$ to get latent embedding $\phi(s_t)$
                 \State Select action $a_t$ using $\epsilon$-greedy policy with $\epsilon=0.3$
@@ -94,6 +97,7 @@
                 \State First encode, then decode \(d\) using $\mathbf{A}$
                 \State Calculate the loss \(L\) of \(s_t\) by comparing the input and output of $\mathbf{A}$
                 \State Update \(w\) with \(o\) as per \(L\)
+                \
             \EndFor
         \EndFor
         \end{algorithmic}[1]
@@ -113,7 +117,7 @@
                 \mycomment{Start using the online LSTD algorithm to update $\theta$}
                 \State Calculate $\tau = \phi(s_t) - \gamma \phi(s_{t+1})$
                 \State Calculate $v = \tau^{T} A^{-1}$
-                \State Update $A^{-1} = A^{-1} - \frac{A^{-1} \phi(i) v^{T}}{1 + v \phi(s)}$
+                \State Update $A^{-1} = A^{-1} - \frac{A^{-1} \phi(s) v^{T}}{1 + v \phi(s)}$
                 \State Update $b = b + r \phi(s)$
                 \State Update state $s_t=s_{t+1}$
             \EndFor

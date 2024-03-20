@@ -85,6 +85,7 @@ class LSTD_DQL_learner():
         self.autoencoder = Autoencoder(self.state_dim, encoding_dim)
         self.autoencoder_optimizer = optim.Adam(self.autoencoder.parameters(), lr=1e-3)
 
+
     def extract_features(self, state):
         # Use the encoder part of the autoencoder to extract features without using gradient descent
         with torch.no_grad():
@@ -92,5 +93,20 @@ class LSTD_DQL_learner():
         return phi_s
     
 
-    def update_LSTD_inv_A_and_b(self, state, next_state):
-        tau = self.extract_features(state) - self.gamma * self.extract_features(next_state)
+    def update_LSTD_inv_A_and_b(self, s, s_next, r):
+        phi_s = self.extract_features(s)
+        phi_s_next = self.extract_features(s_next)
+        tau: torch.Tensor = phi_s - self.gamma * phi_s_next
+        v: torch.Tensor = torch.matmul(tau.t(), self.inv_A)
+
+        # Update inv_A using the Sherman-Morrison formula
+        numerator = torch.matmul(torch.matmul(self.inv_A, phi_s.view(-1, 1)), v.view(1, -1)) #torch.Tensor.view(-1, 1) transforms a tensor into a column vector, torch.Tensor.view(1, -1) transforms a tensor into a row vector
+        denominator = 1 + torch.matmul(v, phi_s)
+        self.inv_A -= numerator / denominator
+
+        # Update b = b + r * phi(s_t)
+        self.b += r * phi_s
+
+
+
+    
