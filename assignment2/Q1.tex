@@ -44,7 +44,7 @@
         \mycomment {\(w_0\) are drawn from a zero-mean Gaussian distribution with $\sigma=1$ and a fixed seed $42$}
         \State Initialize a replay memory buffer $\mathcal{D}$ with a capacity \(N \times T\)
         \State Initialize a discount factor $\gamma=0.9$ 
-        \State Initialize a small constant $\lambda=1 \times 10^{-4}$ to initialize $A^{-1}$ for LSTD  
+        \State Initialize a small constant $\lambda=1 \times 10^{-3}$ to initialize $A^{-1}$ for LSTD  
         \State Add global variables $A^{-1} = \lambda^{-1}I$ and $b=0$ to store the tensors that suffice $\theta_t = A_t^{-1} b_t$ at each time step \(t\)
         \mycomment{A relatively large discount factor encourages long-term planning and faster convergence during training}
         \end{algorithmic}[1]
@@ -90,9 +90,9 @@
                 \\
                 \mycomment{Start updating the autoencoder using minibatches}
                 \State Sample a minibatch of transitions \(d\) from $\mathcal{D}$ with a batchsize \(k\) \
-                \State Use the \(s'\) of \(d\) as input to $\mathbf{A}$
+                \State Use the \(s_t\) of \(d\) as input to $\mathbf{A}$
                 \State First encode, then decode \(d\) using $\mathbf{A}$
-                \State Calculate the loss \(L\) of \(s'\) by comparing the input and output of $\mathbf{A}$
+                \State Calculate the loss \(L\) of \(s_t\) by comparing the input and output of $\mathbf{A}$
                 \State Update \(w\) with \(o\) as per \(L\)
             \EndFor
         \EndFor
@@ -115,7 +115,7 @@
                 \State Calculate $v = \tau^{T} A^{-1}$
                 \State Update $A^{-1} = A^{-1} - \frac{A^{-1} \phi(i) v^{T}}{1 + v \phi(s)}$
                 \State Update $b = b + r \phi(s)$
-                \State Update state $s=s'$
+                \State Update state $s_t=s_{t+1}$
             \EndFor
         \EndFor
         \end{algorithmic}[1]    
