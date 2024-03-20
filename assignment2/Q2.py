@@ -23,6 +23,10 @@ References
 1. https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 """
 
+T = 500 # max time step per episode
+N = 1050 # number of total episodes
+N0 = 50 # number of episodes per phase
+
 class Autoencoder(nn.Module):
     def __init__(self, input_dim, encoding_dim):
         super(Autoencoder, self).__init__()
@@ -68,9 +72,6 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-T = 5000 # max time step per episode
-N = 110 # number of total episodes
-N0 = 10 # number of episodes per phase
 class LSTD_DQL_learner():
 
     def __init__(self, capacity: int, env_name: str, encoding_dim: int, batch_size: int=32, gamma: float=0.9, lambda_val=1e-3):
