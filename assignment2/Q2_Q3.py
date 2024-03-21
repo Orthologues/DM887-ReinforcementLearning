@@ -27,7 +27,7 @@ References
 """
 
 T = 500 # max time step per episode
-N = 1000 # number of total episodes
+N = 1050 # number of total episodes
 N0 = 50 # number of episodes per phase, including the warm-up, the antoencoder update, and the LSTD update phase
 
 """
@@ -55,28 +55,20 @@ def explore_envs():
         env.close()
 
 class Autoencoder(nn.Module):
-    def __init__(self, state_dim, encoding_dim):
+    def __init__(self, input_dim, encoding_dim):
         super(Autoencoder, self).__init__()
         # Encoder, i.e. feature extractor
         self.encoder = nn.Sequential(
-            nn.Linear(state_dim, 128),
+            nn.Linear(input_dim, 128),
             nn.ReLU(True),
-            nn.Linear(128, 64),
-            nn.ReLU(True),
-            nn.Linear(64, 32),
-            nn.ReLU(True),
-            nn.Linear(32, encoding_dim),
+            nn.Linear(128, encoding_dim),
             nn.ReLU(True)
         )
         # Decoder
         self.decoder = nn.Sequential(
-            nn.Linear(encoding_dim, 32),
+            nn.Linear(encoding_dim, 128),
             nn.ReLU(True),
-            nn.Linear(32, 64),
-            nn.ReLU(True),
-            nn.Linear(64, 128),
-            nn.ReLU(True),
-            nn.Linear(128, state_dim),
+            nn.Linear(128, input_dim),
             nn.Sigmoid()  # Use Sigmoid for normalized input
         )
 
@@ -123,8 +115,8 @@ class LSTD_DQL_learner():
         # used for the autoencoder
         self.mem= ReplayMemory(T*N, batch_size)
         self.batch_size = batch_size
-        self.features = torch.rand(encoding_dim).to(device)
-        self.lr = learning_rate
+        self.features()
+        self.learning_rate = learning_rate
         self.state_dim = self.env.observation_space.shape[0]
         self.autoencoder = Autoencoder(self.state_dim, encoding_dim).to(device)
         self.autoencoder_optimizer = optim.Adam(self.autoencoder.parameters(), lr=learning_rate)

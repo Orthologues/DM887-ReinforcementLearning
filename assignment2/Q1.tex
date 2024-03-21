@@ -36,8 +36,8 @@
         \State Initialize the learning rate of $\mathbf{A}$ as $\alpha=1 \times 10^{-2}$ 
         \State Initialize an Adam optimizer \(o\) with a learning rate $\alpha$ for $\mathbf{A}$
         \State Initialize the minibatch size of DQN as \(k=32\) 
-        \State Initialize the total number of training episodes \(N\) = 1050, and the number of episodes at each seperate phase of training \(N_0\) = 50
-        \mycomment {It would be a wise choice to seperate the warm-up phase, the antoencoder update phase, and the LSTD update phase}
+        \State Initialize the total number of training episodes \(N\) = 1000, the number of episodes at each cycle consisting of three phases of training $N_0=50$, and the number of episodes at each seperate phase of training \(N_1\) = 10 
+        \mycomment {It would be a wise choice to seperate the warm-up phase, the antoencoder update phase, and the LSTD update phase at each cycle}
         \State Initialize the number of maximum time step per episode \(T\) = 500
         \State Initialize the weights $\theta_0$ for linear approximation function randomly between $(0, 1)$ which will be used for LSTD
         \State Initialize the feature tensor $\phi_0$ randomly between $(0, 1)$ as the initial output of the encoder of the autoencoder
@@ -56,7 +56,7 @@
         \begin{algorithmic}[1]
             \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
             \State Freeze the weights of $\mathbf{A}$, i.e. \(w\)
-        \For {\(episode\) \(e_0 = 1\) to \(N_0\)}
+        \For {\(episode\) \(e_0 = 1\) to \(N_1\)}
             \State Initialize state \(s\) 
             \State Preprocess \(s\) into \(s_0\) to adapt it as input of $\mathbf{A}$
             \mycomment{preprocessing of high-dimensional states is necessary w.r.t. autoenconders}
@@ -76,7 +76,7 @@
                 \State Store the transition of the current \(t\), i.e. $(s_t, a_t, r_t, s_{t+1})$ in $\mathcal{D}$
             \EndFor
         \EndFor
-        \State $e=e+N_0$
+        \State $e=e+N_1$
         \end{algorithmic}[1]
     \end{algorithm}
     
@@ -87,7 +87,7 @@
             \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
             \State Unfreeze the weights of $\mathbf{A}$, i.e. \(w\)
             \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
-        \For {\(episode\) \(e_0 = 1\) to \(N_0\)}
+        \For {\(episode\) \(e_0 = 1\) to \(N_1\)}
             \State Repeat the same steps at the warm-up phase
             \For {each time step \(t\) = 1 to \(T\)}
                 \State Repeat the same steps at the warm-up phase
@@ -101,7 +101,7 @@
                 \
             \EndFor
         \EndFor
-        \State $e=e+N_0$
+        \State $e=e+N_1$
         \end{algorithmic}[1]
     \end{algorithm}
 
@@ -111,7 +111,7 @@
         \begin{algorithmic}[1]
             \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
             \State Unfreeze the weights of $\mathbf{A}$, i.e. \(w\)
-        \For {\(episode\) \(e_0 = 1\) to \(N_0\)}
+        \For {\(episode\) \(e_0 = 1\) to \(N_1\)}
             \State Repeat the same steps at the warm-up phase
             \For {each time step \(t\) = 1 to \(T\)}
                 \State Repeat the same steps at the warm-up phase
@@ -125,7 +125,7 @@
                 \State Update state $s_t=s_{t+1}$
             \EndFor
         \EndFor
-        \State $e=e+N_0$
+        \State $e=e+N_1$
         \end{algorithmic}[1]    
     \end{algorithm}
 
@@ -135,10 +135,12 @@
         \caption{Training procedure}
         \begin{algorithmic}[1]
         \State Run \(Initialization\)
-        \State Run \(\textit{Warm-up phase}\)
         \While {\(episode\) $e \leq N$}
+            \State Run \(\textit{Warm-up phase}\)
             \State Run \(\textit{Autoencoder update phase}\)
-            \If{$e + N_0 \geq N $}
+            \State Run \(\textit{LSTD update phase}\)
+            \State Run \(\textit{Autoencoder update phase}\)
+            \If{$e + N_1 \geq N $}
                 \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
             \EndIf
             \State Run \(\textit{LSTD update phase}\)
