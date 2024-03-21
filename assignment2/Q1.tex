@@ -36,11 +36,10 @@
         \State Initialize the learning rate of $\mathbf{A}$ as $\alpha=1 \times 10^{-2}$ 
         \State Initialize an Adam optimizer \(o\) with a learning rate $\alpha$ for $\mathbf{A}$
         \State Initialize the minibatch size of DQN as \(k=32\) 
-        \State Initialize the total number of training episodes \(N\) = 1000, the number of episodes at each cycle consisting of three phases of training $N_0=50$, and the number of episodes at each seperate phase of training \(N_1\) = 10 
+        \State Initialize the total number of training episodes \(N\) = 500, the number of episodes at each cycle consisting of three phases of training $N_0=50$, and the number of episodes at each seperate phase of training \(N_1\) = 10 
         \mycomment {It would be a wise choice to seperate the warm-up phase, the antoencoder update phase, and the LSTD update phase at each cycle}
-        \State Initialize the number of maximum time step per episode \(T\) = 500
+        \State Initialize the number of maximum time step per episode \(T\) = 1000
         \State Initialize the weights $\theta_0$ for linear approximation function randomly between $(0, 1)$ which will be used for LSTD
-        \State Initialize the feature tensor $\phi_0$ randomly between $(0, 1)$ as the initial output of the encoder of the autoencoder
         \State Initialize a replay memory buffer $\mathcal{D}$ with a capacity \(N \times T\)
         \State Initialize a discount factor $\gamma=0.9$ 
         \State Initialize a small constant $\lambda=1 \times 10^{-3}$ to initialize $A^{-1}$ for LSTD
@@ -62,17 +61,11 @@
             \mycomment{preprocessing of high-dimensional states is necessary w.r.t. autoenconders}
             \For {each time step \(t\) = 1 to \(T\)}
                 \State Encode state \(s_t\) using $\mathbf{A}$ to get latent embedding $\phi(s_t)$
-                \State Select action $a_t$ using $\epsilon$-greedy policy with $\epsilon=0.3$
-                \mycomment{The learning curves of Game B of Assignment 1 corroborate that a relatively high $\epsilon$ could improve \(Q\) more efficiently when an \(e\) does not end prematurely in the majority of cases}
+                \State Select action $a_t$ using $\epsilon$-greedy policy with $\epsilon=0.2$ with an $\epsilon$ decay
                 \State Execute $a_t$ and obtain reward $r_t$ and new state $s_{t+1}$
                 \If{$s_{t+1} \notin S$}
                     \State \textbf{break}
                 \EndIf
-                \State Store the transition of the current \(t\), i.e. $(s_t, a_t, r_t, s_{t+1})$ in $\mathcal{D}$
-                \State Encode state \(s_t\) using $\mathbf{A}$ to get latent embedding $\phi(s_t)$
-                \State Select action $a_t$ using $\epsilon$-greedy policy with $\epsilon=0.3$
-                \mycomment{The learning curves of Game B of Assignment 1 corroborate that a relatively high $\epsilon$ could improve \(Q\) more efficiently when an \(e\) does not end prematurely in the majority of cases}
-                \State Execute $a_t$ and obtain reward $r_t$ and new state $s_{t+1}$
                 \State Store the transition of the current \(t\), i.e. $(s_t, a_t, r_t, s_{t+1})$ in $\mathcal{D}$
             \EndFor
         \EndFor

@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from typing import List
 
 
 """
@@ -26,18 +27,10 @@ References
 2. https://gymnasium.farama.org/environments/classic_control/
 """
 
-T = 500 # max time step per episode
-N = 1050 # number of total episodes
-N0 = 50 # number of episodes per phase, including the warm-up, the antoencoder update, and the LSTD update phase
-
-"""
-general setup of plotting and 
-"""
-plt.ion()
-# use GPU training if possible
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-
+T = 1000 # max time step per episode
+N = 500 # total number of episodes which consists of 10 cycles
+N0 = 50 # number of episodes per cycle consisting of one warm-up phase, then an autoencoder update phase and an LSTD update phase repeated twice
+N1 = 10 # number of episodes per phase, including the warm-up, the antoencoder update, and the LSTD update phase
 
 """
 exploring the state dimensions and action spaces of each of the required gym envs
@@ -55,20 +48,28 @@ def explore_envs():
         env.close()
 
 class Autoencoder(nn.Module):
-    def __init__(self, input_dim, encoding_dim):
+    def __init__(self, state_dim, encoding_dim):
         super(Autoencoder, self).__init__()
         # Encoder, i.e. feature extractor
         self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 128),
+            nn.Linear(state_dim, 128),
             nn.ReLU(True),
-            nn.Linear(128, encoding_dim),
+            nn.Linear(128, 64),
+            nn.ReLU(True),
+            nn.Linear(64, 32),
+            nn.ReLU(True),
+            nn.Linear(32, encoding_dim),
             nn.ReLU(True)
         )
         # Decoder
         self.decoder = nn.Sequential(
-            nn.Linear(encoding_dim, 128),
+            nn.Linear(encoding_dim, 32),
             nn.ReLU(True),
-            nn.Linear(128, input_dim),
+            nn.Linear(32, 64),
+            nn.ReLU(True),
+            nn.Linear(64, 128),
+            nn.ReLU(True),
+            nn.Linear(128, state_dim),
             nn.Sigmoid()  # Use Sigmoid for normalized input
         )
 
@@ -87,13 +88,13 @@ class ReplayMemory(object):
         self.batch_size = batch_size
         self.memory = deque([], maxlen=capacity) # storing only the states to save memory instead using the standard (s, a, r, s') version
 
-    def push(self, state: tuple):
+    def push(self, state: torch.tensor):
         """Save a state to the buffer instead of a transition defined at standard DQN"""
         self.memory.append(state)
 
-    def sample(self):
+    def sample(self) -> List[torch.tensor]:
         if len(self.memory) < self.batch_size:
-            return []
+            return list(self.memory)
         return random.sample(self.memory, self.batch_size)
 
     def __len__(self):
@@ -102,50 +103,142 @@ class ReplayMemory(object):
 
 class LSTD_DQL_learner():
 
-    def __init__(self, device:str, env_name: str, n_actions: int, encoding_dim: int, batch_size: int=32, gamma: float=0.9, lambda_val=1e-2, learning_rate = 1e-3):
+    def __init__(self, device:str, env_name: str, n_actions: int, encoding_dim: int, batch_size: int=32, gamma: float=0.9, lambda_val=1e-3, learning_rate = 1e-2, epsilon=0.2):
         # used for both parts of training
         self.n_actions = n_actions
+        self.episode = 0
         self.env = gym.make(env_name)
         self.encoding_dim = encoding_dim
+        self.steps_done = 0
+        self.eps = epsilon
+        self.eps_decay_denom = T
+        self.device = device
         # used for the LSTD
         self.gamma = gamma
-        self.inv_A = [torch.eye(encoding_dim) / lambda_val for _ in range(n_actions)] # torch.eye creates identity matrix by default
-        self.b = [torch.zeros(encoding_dim) for _ in range(n_actions) ] # Initialize b as a zero vector
-        self.theta = torch.rand((n_actions, encoding_dim)).to(device) # creates a matrix of random numbers between 0 and 1 with the given shape
+        self.inv_A: torch.Tensor = torch.eye((n_actions, encoding_dim)).to(device) / lambda_val  # torch.eye creates identity matrix
+        self.b: torch.Tensor = torch.zeros((n_actions, encoding_dim)).to(device) # Initialize b 
+        self.theta: torch.Tensor = torch.rand((n_actions, encoding_dim)).to(device) # creates a matrix of random numbers between 0 and 1 with the given shape
         # used for the autoencoder
         self.mem= ReplayMemory(T*N, batch_size)
         self.batch_size = batch_size
-        self.features()
-        self.learning_rate = learning_rate
+        self.lr = learning_rate
         self.state_dim = self.env.observation_space.shape[0]
         self.autoencoder = Autoencoder(self.state_dim, encoding_dim).to(device)
         self.autoencoder_optimizer = optim.Adam(self.autoencoder.parameters(), lr=learning_rate)
 
 
-    def extract_features(self, state):
+    def get_Q_sa_tensor(self, phi_s):
+        return torch.matmul(self.theta, phi_s).view(-1, 1) # .view(-1, 1) enforces transformation of an 1D vector to a column vector to enable torch.matmul
+
+
+    def get_phi_s(self, state): # extract the features from the state using the autoencoder
         # Use the encoder part of the autoencoder to extract features without using gradient descent
         with torch.no_grad():
             phi_s = self.autoencoder.encode(state)
-        self.features = phi_s
+        return phi_s
     
 
-    def update_LSTD_inv_A_and_b(self, s, s_next, r):
-        phi_s = self.extract_features(s)
-        phi_s_next = self.extract_features(s_next)
-        tau: torch.Tensor = phi_s - self.gamma * phi_s_next
-        v: torch.Tensor = torch.matmul(tau.t(), self.inv_A)
+    def epsilon_greedy_action(self, state) -> torch.Tensor:
+        rand_num = random.random() # a random number between 0 and 1
+        EPS_LOW = self.eps # 0.2
+        EPS_HIGH = 1 - self.eps # 0.8
+        # actions at the start of a training cycle are highly random since $EPS_THRESHOLD starts at almost 0.2 and converges to 0.8
+        EPS_THRESHOLD = EPS_LOW + (EPS_HIGH - EPS_LOW) * (1. - math.exp(-1. * self.steps_done / self.eps_decay_denom))
+        self.steps_done += 1
+        # select a policy
+        if rand_num < EPS_THRESHOLD:
+            phi_s = self.get_phi_s(state)
+            return torch.argmax(self.get_Q_sa_tensor(phi_s))
+        else:
+            return torch.tensor([[self.env.action_space.sample()]], device=self.device, dtype=torch.long)
+        
 
-        # Update inv_A using the Sherman-Morrison formula
-        numerator = torch.matmul(torch.matmul(self.inv_A, phi_s.view(-1, 1)), v.view(1, -1)) #torch.Tensor.view(-1, 1) transforms a tensor into a column vector, torch.Tensor.view(1, -1) transforms a tensor into a row vector
-        denominator = 1 + torch.matmul(v, phi_s)
-        self.inv_A -= numerator / denominator
+    def optimize_autoencoder(self):
+        if len(self.mem) < self.batch_size:
+            return
+        sampled_states: List[torch.tensor] = self.mem.sample(self.batch_size)
+        state_batch = torch.cat(sampled_states)
+        states_reconstructed = self.autoencoder.forward(state_batch)
+        loss = torch.nn.MSELoss()(states_reconstructed, state_batch)
+        # Optimize the model
+        self.autoencoder_optimizer.zero_grad() # clears x.grad for every parameter x in the optimizer accumulated as previous steps
+        loss.backward() # computes dloss/dx
+        self.autoencoder_optimizer.step() # update thr weights
 
-        # Update b = b + r * phi(s_t)
-        self.b += r * phi_s
 
+    def get_reset_state(self):
+        state, _ = self.env.reset()
+        # F.sigmoid is used for normalization
+        return F.sigmoid(torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0))
+
+
+    def reset_inv_A_and_b_for_LSTD(self):
+        self.inv_A: torch.Tensor = torch.eye((self.n_actions, self.encoding_dim)).to(self.device) / self.lambda_val  # torch.eye creates identity matrix
+        self.b: torch.Tensor = torch.zeros((self.n_actions, self.encoding_dim)).to(self.device) # Initialize b 
+        self.theta: torch.Tensor = torch.rand((self.n_actions, self.encoding_dim)).to(self.device) # creates a matrix of random numbers between 0 and 1 with the given shape
+
+
+    def run_warm_up_phase(self):
+        for _ in range(N1):
+            state = self.get_reset_state()
+            for _ in range(T):
+                action = self.epsilon_greedy_action(state)
+                observation, _, terminated, truncated, _ = self.env.step(action.item()) # reward: float
+                done = terminated or truncated
+
+                if done:
+                    break
+ 
+                next_state = F.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+                self.mem.push(state)
+                state = next_state
+
+            self.episode += 1
+
+
+    def run_autoencoder_update_phase(self):
+        for _ in range(N1):
+            state = self.get_reset_state()
+            action = self.epsilon_greedy_action(state)
+            observation, _, terminated, truncated, _ = self.env.step(action.item()) # reward: float
+            done = terminated or truncated
+            self.episode += 1
+
+            if done:
+                break
+ 
+            next_state = F.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+            self.mem.push(state)
+            state = next_state
+            self.optimize_autoencoder()
+
+
+    def run_LSTD_update_phase(self):
+        for _ in range(N1):
+            state = self.get_reset_state()
+
+            self.episode += 1
+
+
+    def run_training_cycle(self):
+        for _ in range(int(N/N0)):
+            self.run_warm_up_phase()
+            for _ in range( int((N0-N1)/(2*N1)) ):
+                self.reset_inv_A_and_b_for_LSTD()
+                self.run_autoencoder_update_phase()
+                if self.episode + N1 >= N:
+                    self.reset_inv_A_and_b_for_LSTD()
+                self.run_LSTD_update_phase()
 
 
 if __name__ == "__main__":
+
+    """
+    general setup of plotting and 
+    """
+    plt.ion()
+    # use GPU training if possible
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     """
     only for experimental purposes
     """
@@ -155,7 +248,7 @@ if __name__ == "__main__":
         print("Training on the GPU")
     else:
         print("Training on the CPU")
-    # define the objects use for gym env training after exploring the envs
+    # define the params for gym env training after exploring the envs
     ENV = namedtuple('env', ('name', 'n_actions', 'encoding_dim'))
     env1 = ENV('Acrobot-v1', 3, 12) # 6x2, 6 is the number of observations in the env
     env2 = ENV('MountainCar-v0', 3, 4) # 2X2, 2 is the number of observations in the env
