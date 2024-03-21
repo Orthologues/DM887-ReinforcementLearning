@@ -32,22 +32,20 @@
         \begin{algorithmic}[1]
         \caption{Initialization}
         \State Initialize a variational autoencoder $\mathbf{A}$ as the feature extraction network with initial weights \(w_0\)
-        \State Initialize the learning rate of $\mathbf{A}$ as $\alpha=1 \times 10^{-3}$ 
-        \State Initialize an Adam optimizer \(o\) with a learning rate $\alpha$ for $\mathbf{A}$
         \mycomment {\(w_0\) are drawn from Glorot uniform initialization}
+        \State Initialize the learning rate of $\mathbf{A}$ as $\alpha=1 \times 10^{-2}$ 
+        \State Initialize an Adam optimizer \(o\) with a learning rate $\alpha$ for $\mathbf{A}$
         \State Initialize the minibatch size of DQN as \(k=32\) 
         \State Initialize the total number of training episodes \(N\) = 1050, and the number of episodes at each seperate phase of training \(N_0\) = 50
         \mycomment {It would be a wise choice to seperate the warm-up phase, the antoencoder update phase, and the LSTD update phase}
-        \\
-        \mycomment {Initialization of training hyperparameters}
         \State Initialize the number of maximum time step per episode \(T\) = 500
-        \State Initialize the weights $\theta_0$ for linear approximation function $y = f(phi(s))$ which will be used for LSTD
-        \mycomment {\(w_0\) are drawn from a zero-mean Gaussian distribution with $\sigma=1$ and a fixed seed $42$}
+        \State Initialize the weights $\theta_0$ for linear approximation function randomly between $(0, 1)$ which will be used for LSTD
+        \State Initialize the feature tensor $\phi_0$ randomly between $(0, 1)$ as the initial output of the encoder of the autoencoder
         \State Initialize a replay memory buffer $\mathcal{D}$ with a capacity \(N \times T\)
         \State Initialize a discount factor $\gamma=0.9$ 
         \State Initialize a small constant $\lambda=1 \times 10^{-3}$ to initialize $A^{-1}$ for LSTD
         \State Given the number of actions as \(N_a\) and embedding dimension \(N_e\), initialize a matrix $\theta$ with shape $N_a \times N_e$
-        \State Initialize $A^{-1} = \lambda^{-1}I$ and $b=0$ to store the tensors that suffice $\theta_t = A_t^{-1} b_t$ at each time step \(t\)
+        \State Initialize a tensor $A_a^{-1} = \lambda^{-1}I$ and a tensor $b_a=0$ to store the tensors that suffice $\theta_{a} = A_a^{-1} b_a$, $\forall a \in A$ at each time step $t$
         \mycomment{A relatively large discount factor encourages long-term planning and faster convergence during training}
         \end{algorithmic}[1]
     \end{algorithm}
@@ -88,7 +86,7 @@
         \begin{algorithmic}[1]
             \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
             \State Unfreeze the weights of $\mathbf{A}$, i.e. \(w\)
-            \State Reset \(A^{-1}\) and \(b\) to the default value at the initialization phase 
+            \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
         \For {\(episode\) \(e_0 = 1\) to \(N_0\)}
             \State Repeat the same steps at the warm-up phase
             \For {each time step \(t\) = 1 to \(T\)}
@@ -141,7 +139,7 @@
         \While {\(episode\) $e \leq N$}
             \State Run \(\textit{Autoencoder update phase}\)
             \If{$e + N_0 \geq N $}
-                \State Reset \(A^{-1}\) and \(b\) to the default value at the initialization phase 
+                \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
             \EndIf
             \State Run \(\textit{LSTD update phase}\)
         \EndWhile
