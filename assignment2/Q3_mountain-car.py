@@ -30,7 +30,7 @@ if __name__ == "__main__":
     env2 = ENV('MountainCar-v0', 3, 1) # 'encoding_dim' = math.ceil(2/2), 2 is the number of observations in the env
     ENVS = [env1, env2]
     
-    for env in ENVS:
+    for idx, env in enumerate(ENVS):
         learner = LSTD_DQL_learner(
             env_name=env.name, 
             n_actions=env.n_actions, 
@@ -38,4 +38,5 @@ if __name__ == "__main__":
             device=device
         )
         learner.run_training_cycle()
-        print(learner.eval_records)
+        learner.plot_total_reward_mean_and_std(f"mountaincar-{idx}")
+        

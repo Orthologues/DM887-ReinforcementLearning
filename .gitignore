@@ -8,3 +8,4 @@ GridWorld/
 *.fdb_latexmk
 *.log
 *.synctex.gz
+__pycache__/

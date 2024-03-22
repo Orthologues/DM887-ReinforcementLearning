@@ -4,7 +4,7 @@ import gymnasium as gym
 import math
 import random
 import matplotlib.pyplot as plt
-from collections import namedtuple, deque
+from collections import deque
 
 import torch
 import torch.nn as nn
@@ -25,8 +25,6 @@ References
 2. https://gymnasium.farama.org/environments/classic_control/
 """
 
-EVAL_EPISODE_INTERVAL = 10
-EVAL_EPISODE = 5
 
 """
 exploring the state dimensions and action spaces of each of the required gym envs
@@ -109,20 +107,24 @@ class LSTD_DQL_learner():
                  lambda_val=1e-3, 
                  alpha = 1e-2, 
                  epsilon=0.2,
-                 T = 1000,
-                 N = 500,
-                 N0 = 50,
-                 N1 = 10,
-                 N_eval = 5,
+                 T = 1000, # number of maximum time step per episode
+                 N = 1000, # number of total training episodes
+                 N0 = 100, # number of episodes per cycle
+                 N1 = 20, # number of warm-up episodes per cycle
+                 N2 = 5, # number of autoencoder update episodes per cycle
+                 N3 = 35, # number of LSTD
+                 N_eval = 5, # number of repeated evaluation episodes per round
                 ):
         # used for both parts of training
         self.T = T # max time step per episode
         self.N = N # total number of episodes consisting of multiple cycles
         self.N0 = N0 # number of episodes per cycle consisting of one warm-up phase, then an autoencoder update phase and an LSTD update phase repeated twice
-        self.N1 = N1 # number of episodes per phase, including the warm-up, the antoencoder update, and the LSTD update phase
+        self.N1 = N1 
+        self.N2 = N2
+        self.N3 = N3
         self.N_eval = N_eval
         assert( N%N0==0 )
-        assert( (N0-N1) % (2*N1) ==0 )
+        assert( (N0-N1) % (N2+N3)==0 )
         
         self.total_reward: float = 0
         self.total_reward_list: List[float] = []
@@ -199,7 +201,7 @@ class LSTD_DQL_learner():
     def reset_LSTD_weights(self):
         self.inv_A: torch.Tensor = torch.eye(self.encoding_dim).unsqueeze(0).repeat(self.n_actions, 1, 1).to(self.device) / self.lambda_val  # torch.eye creates identity matrix
         self.b: torch.Tensor = torch.zeros((self.n_actions, self.encoding_dim)).to(self.device) # Initialize b 
-        self.theta: torch.Tensor = torch.rand((self.n_actions, self.encoding_dim)).to(self.device) # creates a matrix of random numbers between 0 and 1 with the given shape
+        self.theta: torch.Tensor = torch.rand((self.n_actions, self.encoding_dim)).to(self.device) 
 
 
     def run_warm_up_phase(self):
@@ -222,8 +224,8 @@ class LSTD_DQL_learner():
 
 
     def run_autoencoder_update_phase(self):
-
-        for _ in range(self.N1):
+        
+        for _ in range(self.N2):
             state = self.get_reset_state()
             self.training_episode += 1
  
@@ -246,7 +248,7 @@ class LSTD_DQL_learner():
 
         self.reset_LSTD_weights()
 
-        for _ in range(self.N1):
+        for _ in range(self.N3):
             state = self.get_reset_state()
             self.training_episode += 1
 
@@ -292,11 +294,11 @@ class LSTD_DQL_learner():
 
     def run_training_cycle(self):
         for _ in range(int(self.N/self.N0)):
-            self.steps_done = 0 # reset the steps_done variable to 0 at the start of each training cycle to increase randomization at eps-greedy policy
+            self.steps_done = 0
             self.run_warm_up_phase()
             self.run_eval_mode()
             print(self.training_episode)
-            for _ in range( int((self.N0- self.N1)/(2* self.N1)) ):
+            for _ in range( int((self.N0- self.N1)/(self.N2 + self.N3)) ):
                 self.run_autoencoder_update_phase()
                 print(self.training_episode)
                 self.run_eval_mode()
@@ -343,3 +345,25 @@ class LSTD_DQL_learner():
         std_reward = np.std(total_rewards)
         # return to the three variables that are necessary to generate the required plots
         self.eval_records.append((self.GD_step, mean_reward, std_reward))
+
+
+    # the plotting function 
+    def plot_total_reward_mean_and_std(self, fname_suffix: str):
+
+        # Create the plot
+        fig, ax = plt.subplots(figsize=(16, 9))
+        mean_lines = []
+
+        gd_time_steps = [ record[0] for record in self.eval_records ]
+        total_r_mean = [ record[1] for record in self.eval_records ]
+        mean_line, = ax.plot(gd_time_steps, total_r_mean, color='b')
+        mean_lines.append(mean_line)
+        # Fill between mean +/- standard error with semi-transparent color
+        mean_upper = [ record[1] + record[2] for record in self.eval_records ]
+        mean_lower = [ record[1] - record[2] for record in self.eval_records ]
+        ax.fill_between(gd_time_steps, mean_upper, mean_lower, alpha=0.2, color='g')
+        # Add labels and title
+        ax.set_xlabel("Gradient-Descent time step")
+        ax.set_ylabel("Mean Total Episode Reward")
+        ax.set_title(f"Epsilon-greedy DQN with Autoencoder and LSTD ({fname_suffix})")
+        fig.savefig(f"learning-curve-{fname_suffix}.png", dpi=150, bbox_inches='tight') 

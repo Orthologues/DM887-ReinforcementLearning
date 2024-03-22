@@ -24,8 +24,8 @@ References
 # create a class "LSTD_DQL_pendulum_learner" inherited from "LSTD_DQL_learner" designed for the pendulum problem
 class LSTD_DQL_pendulum_learner(LSTD_DQL_learner):
 
-    def __init__(self, device: str, env_name: str, n_actions: int, encoding_dim: int, batch_size: int = 32, gamma: float = 0.9, lambda_val=0.001, alpha=0.01, epsilon=0.2, T=1000, N=500, N0=50, N1=10, N_eval=5):
-        super().__init__(device, env_name, n_actions, encoding_dim, batch_size, gamma, lambda_val, alpha, epsilon, T, N, N0, N1, N_eval)
+    def __init__(self, device: str, env_name: str, n_actions: int, encoding_dim: int, batch_size: int = 32, gamma: float = 0.9, lambda_val=0.001, alpha=0.01, epsilon=0.2, T=1000, N=1000, N0=100, N1=20, N2=5, N3=35, N_eval=5):
+        super().__init__(device, env_name, n_actions, encoding_dim, batch_size, gamma, lambda_val, alpha, epsilon, T, N, N0, N1, N2, N3, N_eval)
     
         self.action_intervals = np.linspace(-2, 2, num=11)  # Creates 10 intervals
         self.discretized_actions = (self.action_intervals[:-1] + self.action_intervals[1:]) / 2  # Medians of intervals
@@ -91,7 +91,7 @@ class LSTD_DQL_pendulum_learner(LSTD_DQL_learner):
     # overwrite all methods with 'epsilon_greedy_action'
     def run_autoencoder_update_phase(self):
 
-        for _ in range(self.N1):
+        for _ in range(self.N2):
             state = self.get_reset_state()
             self.training_episode += 1
  
@@ -114,7 +114,7 @@ class LSTD_DQL_pendulum_learner(LSTD_DQL_learner):
 
         self.reset_LSTD_weights()
 
-        for _ in range(self.N1):
+        for _ in range(self.N3):
             state = self.get_reset_state()
             self.training_episode += 1
 
@@ -213,7 +213,7 @@ if __name__ == "__main__":
     env2 = ENV('Pendulum-v1', 10, 2) # 'encoding_dim' = math.ceil(3/2), 3 is the number of observations in the env
     ENVS = [env1, env2]
 
-    for env in ENVS:
+    for idx, env in enumerate(ENVS):
         learner = LSTD_DQL_pendulum_learner(
             env_name=env.name, 
             n_actions=env.n_actions, 
@@ -221,4 +221,5 @@ if __name__ == "__main__":
             device=device
         )
         learner.run_training_cycle()
-        print(learner.eval_records)
+        learner.plot_total_reward_mean_and_std(f"pendulum-{idx}")
+        
