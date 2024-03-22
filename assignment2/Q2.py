@@ -5,7 +5,6 @@ import math
 import random
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
-from itertools import count
 
 import torch
 import torch.nn as nn
@@ -138,7 +137,9 @@ class LSTD_DQL_learner():
         self.device = device
         # used for the LSTD
         self.gamma = gamma
+        self.lambda_val = lambda_val
         self.reset_LSTD_weights()
+
         # used for the autoencoder
         self.mem= ReplayMemory(T*N, batch_size)
         self.batch_size = batch_size
@@ -149,7 +150,7 @@ class LSTD_DQL_learner():
         self.eval_records: List[Tuple[int, float, float]] = [] 
 
 
-    def Q_sa_2D_tensor(weight, phi_s):
+    def Q_sa_2D_tensor(self, weight, phi_s):
         # returns to shape [encoding_dim, 1]
         return torch.matmul(weight, phi_s.view(-1, 1)) # .view(-1, 1) enforces transformation of an 1D vector to a column vector to enable torch.matmul
 
@@ -179,8 +180,8 @@ class LSTD_DQL_learner():
     def optimize_autoencoder(self):
         if len(self.mem) < self.batch_size:
             return
-        sampled_states: List[torch.tensor] = self.mem.sample(self.batch_size)
-        state_batch = torch.cat(sampled_states)
+        sampled_states: List[torch.tensor] = self.mem.sample()
+        state_batch = torch.stack(sampled_states, dim=0)
         states_reconstructed = self.autoencoder.forward(state_batch)
         loss = torch.nn.MSELoss()(states_reconstructed, state_batch)
         # Optimize the model
@@ -196,7 +197,7 @@ class LSTD_DQL_learner():
 
 
     def reset_LSTD_weights(self):
-        self.inv_A: torch.Tensor = torch.eye((self.n_actions, self.encoding_dim, self.encoding_dim)).to(self.device) / self.lambda_val  # torch.eye creates identity matrix
+        self.inv_A: torch.Tensor = torch.eye(self.encoding_dim).unsqueeze(0).repeat(self.n_actions, 1, 1).to(self.device) / self.lambda_val  # torch.eye creates identity matrix
         self.b: torch.Tensor = torch.zeros((self.n_actions, self.encoding_dim)).to(self.device) # Initialize b 
         self.theta: torch.Tensor = torch.rand((self.n_actions, self.encoding_dim)).to(self.device) # creates a matrix of random numbers between 0 and 1 with the given shape
 
@@ -209,7 +210,7 @@ class LSTD_DQL_learner():
 
             for _ in range(self.T):
                 action = self.epsilon_greedy_action(state)
-                observation, reward, terminated, truncated, _ = self.env.step(action.item()) # reward: float
+                observation, _, terminated, truncated, _ = self.env.step(action.item()) # reward: float
                 done = terminated or truncated
                 
                 if done:
@@ -221,8 +222,6 @@ class LSTD_DQL_learner():
 
 
     def run_autoencoder_update_phase(self):
-
-        self.reset_LSTD_weights()
 
         for _ in range(self.N1):
             state = self.get_reset_state()
@@ -245,9 +244,7 @@ class LSTD_DQL_learner():
 
     def run_LSTD_update_phase(self):
 
-        # if it is the final phase of the entire training process, reset the LSTD weights
-        if self.training_episode + self.N1 >= self.N:
-            self.reset_LSTD_weights()
+        self.reset_LSTD_weights()
 
         for _ in range(self.N1):
             state = self.get_reset_state()
@@ -277,7 +274,7 @@ class LSTD_DQL_learner():
                 # numerator would have the shape of (encoding_dim, encoding_dim)
                 numerator = torch.matmul(torch.matmul(self.inv_A[action], phi_s.view(-1, 1)), v.view(1, -1)).squeeze(0) #torch.Tensor.view(-1, 1) transforms a tensor into a column vector, torch.Tensor.view(1, -1) transforms a tensor into a row vector
                 # denominator would become a scalar due to its shape [1, 1]
-                denominator = 1 + torch.matmul(v.view(-1, 1), phi_s)
+                denominator = 1 + torch.matmul(v.view(1, -1), phi_s)
                 self.inv_A[action] -= numerator / denominator
 
                 """
@@ -298,10 +295,13 @@ class LSTD_DQL_learner():
             self.steps_done = 0 # reset the steps_done variable to 0 at the start of each training cycle to increase randomization at eps-greedy policy
             self.run_warm_up_phase()
             self.run_eval_mode()
+            print(self.training_episode)
             for _ in range( int((self.N0- self.N1)/(2* self.N1)) ):
                 self.run_autoencoder_update_phase()
+                print(self.training_episode)
                 self.run_eval_mode()
                 self.run_LSTD_update_phase()
+                print(self.training_episode)
                 self.run_eval_mode()
 
 

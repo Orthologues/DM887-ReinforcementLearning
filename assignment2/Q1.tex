@@ -79,7 +79,6 @@
         \begin{algorithmic}[1]
             \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
             \State Unfreeze the weights of $\mathbf{A}$, i.e. \(w\)
-            \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
         \For {\(episode\) \(e_0 = 1\) to \(N_1\)}
             \State Repeat the same steps at the warm-up phase
             \For {each time step \(t\) = 1 to \(T\)}
@@ -131,11 +130,10 @@
         \While {\(episode\) $e \leq N$}
             \State Run \(\textit{Warm-up phase}\)
             \State Run \(\textit{Autoencoder update phase}\)
+            \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
             \State Run \(\textit{LSTD update phase}\)
             \State Run \(\textit{Autoencoder update phase}\)
-            \If{$e + N_1 \geq N $}
-                \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
-            \EndIf
+            \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
             \State Run \(\textit{LSTD update phase}\)
         \EndWhile
         \end{algorithmic}[1]    

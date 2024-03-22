@@ -1,6 +1,7 @@
 #! /opt/homebrew/anaconda3/bin/python
 
 from collections import namedtuple
+from Q2 import LSTD_DQL_learner
 import torch
 import numpy as np
 
@@ -29,3 +30,12 @@ if __name__ == "__main__":
     env2 = ENV('MountainCar-v0', 3, 1) # 'encoding_dim' = math.ceil(2/2), 2 is the number of observations in the env
     ENVS = [env1, env2]
     
+    for env in ENVS:
+        learner = LSTD_DQL_learner(
+            env_name=env.name, 
+            n_actions=env.n_actions, 
+            encoding_dim=env.encoding_dim, 
+            device=device
+        )
+        learner.run_training_cycle()
+        print(learner.eval_records)

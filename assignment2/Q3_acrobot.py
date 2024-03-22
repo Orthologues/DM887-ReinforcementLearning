@@ -2,6 +2,7 @@
 
 from collections import namedtuple
 import torch
+from Q2 import LSTD_DQL_learner
 import numpy as np
 
 """
@@ -29,4 +30,12 @@ if __name__ == "__main__":
     env2 = ENV('Acrobot-v1', 3, 3) # 'encoding_dim' = math.ceil(6/2), 6 is the number of observations in the env
     ENVS = [env1, env2]
 
-
+    for env in ENVS:
+        learner = LSTD_DQL_learner(
+            env_name=env.name, 
+            n_actions=env.n_actions, 
+            encoding_dim=env.encoding_dim, 
+            device=device
+        )
+        learner.run_training_cycle()
+        print(learner.eval_records)
