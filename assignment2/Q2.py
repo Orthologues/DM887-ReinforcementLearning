@@ -116,7 +116,7 @@ class LSTD_DQL_learner():
                  N = 500,
                  N0 = 50,
                  N1 = 10,
-                 N_eval = 5
+                 N_eval = 5,
                 ):
         # used for both parts of training
         self.T = T # max time step per episode
@@ -140,9 +140,7 @@ class LSTD_DQL_learner():
         self.device = device
         # used for the LSTD
         self.gamma = gamma
-        self.inv_A: torch.Tensor = torch.eye((n_actions, encoding_dim, encoding_dim)).to(device) / lambda_val  # torch.eye creates identity matrix
-        self.b: torch.Tensor = torch.zeros((n_actions, encoding_dim, encoding_dim)).to(device) # Initialize b 
-        self.theta: torch.Tensor = torch.rand((n_actions, encoding_dim, encoding_dim)).to(device) # creates a matrix of random numbers between 0 and 1 with the given shape
+        self.reset_LSTD_weights()
         # used for the autoencoder
         self.mem= ReplayMemory(T*N, batch_size)
         self.batch_size = batch_size
@@ -175,12 +173,10 @@ class LSTD_DQL_learner():
         # select a policy
         if rand_num < EPS_THRESHOLD:
             phi_s: torch.Tensor = self.get_phi_s(state)
-            result = torch.matmul(self.theta, phi_s.view(-1, 1))
-            result_squeezed = torch.squeeze(result, -1)  # Squeezing the last dimension
-            return torch.argmax(result_squeezed, dim=0)
+            return torch.argmax(self.Q_sa_2D_tensor(self.theta, phi_s), dim=0)
         
-        return torch.tensor([[self.env.action_space.sample()]], device=self.device, dtype=torch.long)
-        
+        return torch.tensor([self.env.action_space.sample()], device=self.device, dtype=torch.long)
+    
 
     def optimize_autoencoder(self):
         if len(self.mem) < self.batch_size:
@@ -203,8 +199,8 @@ class LSTD_DQL_learner():
 
     def reset_LSTD_weights(self):
         self.inv_A: torch.Tensor = torch.eye((self.n_actions, self.encoding_dim, self.encoding_dim)).to(self.device) / self.lambda_val  # torch.eye creates identity matrix
-        self.b: torch.Tensor = torch.zeros((self.n_actions, self.encoding_dim, self.encoding_dim)).to(self.device) # Initialize b 
-        self.theta: torch.Tensor = torch.rand((self.n_actions, self.encoding_dim, self.encoding_dim)).to(self.device) # creates a matrix of random numbers between 0 and 1 with the given shape
+        self.b: torch.Tensor = torch.zeros((self.n_actions, self.encoding_dim)).to(self.device) # Initialize b 
+        self.theta: torch.Tensor = torch.rand((self.n_actions, self.encoding_dim)).to(self.device) # creates a matrix of random numbers between 0 and 1 with the given shape
 
 
     def run_warm_up_phase(self):
@@ -274,27 +270,27 @@ class LSTD_DQL_learner():
                 phi_s_next: torch.Tensor = self.get_phi_s(next_state)
 
                 # calculting temporal difference
-                tau: torch.Tensor = phi_s - self.gamma * phi_s_next # shape of tau would be (encoding_dim, 1)
-                v: torch.Tensor = torch.matmul(tau.t(), self.inv_A[action]) # shape of tau.t() would be (1, encoding_dim), and self.inv_A[action] would be (encoding_dim, encoding_dim)
+                tau: torch.Tensor = phi_s - self.gamma * phi_s_next # shape of tau would be (1, encoding_dim)
+                v: torch.Tensor = torch.matmul(tau.view(1, -1), self.inv_A[action]) # shape of tau.t() would be (1, encoding_dim), and self.inv_A[action] would be (encoding_dim, encoding_dim)
                 
                 """
                 Update inv_A using the Sherman-Morrison formula
                 """
                 # numerator would have the shape of (encoding_dim, encoding_dim)
-                numerator = torch.matmul(torch.matmul(self.inv_A[action], phi_s.view(-1, 1)), v.view(1, -1)) #torch.Tensor.view(-1, 1) transforms a tensor into a column vector, torch.Tensor.view(1, -1) transforms a tensor into a row vector
+                numerator = torch.matmul(torch.matmul(self.inv_A[action], phi_s.view(-1, 1)), v.view(1, -1)).squeeze(0) #torch.Tensor.view(-1, 1) transforms a tensor into a column vector, torch.Tensor.view(1, -1) transforms a tensor into a row vector
                 # denominator would become a scalar due to its shape [1, 1]
-                denominator = 1 + torch.matmul(v, phi_s)
+                denominator = 1 + torch.matmul(v.view(-1, 1), phi_s)
                 self.inv_A[action] -= numerator / denominator
 
                 """
-                Update b
+                Update b, the term before "* phi_s.squeeze()" is a scalar
                 """
-                self.b[action] += ((reward + self.gamma * torch.max(self.Q_sa_2D_tensor(self.theta[action], phi_s_next), dim=0)) * phi_s.squeeze()).unsqueeze(1)
+                self.b[action] += ( reward + self.gamma * torch.max(self.Q_sa_2D_tensor(self.theta, phi_s_next), dim=0).values ) * phi_s.squeeze()
 
                 """
                 Update action-specific LSTD weights
                 """
-                self.theta[action] = torch.matmul(self.inv_A[action], self.b[action])
+                self.theta[action] = torch.matmul(self.inv_A[action], self.b[action].view(-1, 1)).squeeze()
 
                 state = next_state
 
