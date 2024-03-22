@@ -26,9 +26,7 @@ if __name__ == "__main__":
 
     ENV = namedtuple('env', ('name', 'n_actions', 'encoding_dim'))
 
-    env1 = ENV('Acrobot-v1', 3, 12) # 'encoding_dim' = 6x2, 6 is the number of observations in the env
-    env2 = ENV('Acrobot-v1', 3, 3) # 'encoding_dim' = math.ceil(6/2), 6 is the number of observations in the env
-    ENVS = [env1, env2]
+    env = ENV('Acrobot-v1', 3, 3) # 'encoding_dim' = math.ceil(6/2), 6 is the number of observations in the env
 
     """
     The following code is experimental. It turns out that halving the dimension by the encoder would lead to a better performace
@@ -44,10 +42,10 @@ if __name__ == "__main__":
     #    learner.plot_total_reward_mean_and_std(f"acrobot-{idx}")
 
     learner = LSTD_DQL_learner(
-        env_name = env2.name, 
-        n_actions = env2.n_actions, 
-        encoding_dim = env2.encoding_dim, 
+        env_name = env.name, 
+        n_actions = env.n_actions, 
+        encoding_dim = env.encoding_dim, 
         device=device
     )
     learner.run_training_cycle()
-    learner.plot_total_reward_mean_and_std(f"acrobot")
+    learner.plot_total_reward_mean_and_std("acrobot")

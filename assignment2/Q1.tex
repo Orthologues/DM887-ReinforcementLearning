@@ -33,18 +33,19 @@
         \caption{Initialization}
         \State Initialize a variational autoencoder $\mathbf{A}$ as the feature extraction network with initial weights \(w_0\)
         \mycomment {\(w_0\) are drawn from Glorot uniform initialization}
-        \State Initialize the learning rate of $\mathbf{A}$ as $\alpha=1 \times 10^{-2}$ 
+        \State Initialize the learning rate of $\mathbf{A}$ as $\alpha$ 
         \State Initialize an Adam optimizer \(o\) with a learning rate $\alpha$ for $\mathbf{A}$
-        \State Initialize the minibatch size of DQN as \(k=32\) 
-        \State Initialize the total number of training episodes \(N\) = 500, the number of episodes at each cycle consisting of three phases of training $N_0=50$, and the number of episodes at each seperate phase of training \(N_1\) = 10 
+        \State Initialize the minibatch size of DQN as \(k\) 
+        \State Initialize the total number of training episodes \(N\), the number of episodes at each cycle consisting of three phases of training $N_0$, ensure that $N \mod N_0 = 0$
+        \State Set the number of episodes at the warm-up phase as \(N_1\), at the autoencoder update phase as \(N_2\), and at the LSTD weight update phase as \(N_3\), ensure that $(N_0-N_1) \mod (N2+N3) = 0$
         \mycomment {It would be a wise choice to seperate the warm-up phase, the antoencoder update phase, and the LSTD update phase at each cycle}
-        \State Initialize the number of maximum time step per episode \(T\) = 1000
+        \State Initialize the number of maximum time step per episode \(T\)
         \State Initialize the weights $\theta_0$ for linear approximation function randomly between $(0, 1)$ which will be used for LSTD
         \State Initialize a replay memory buffer $\mathcal{D}$ with a capacity \(N \times T\)
-        \State Initialize a discount factor $\gamma=0.9$ 
-        \State Initialize a small constant $\lambda=1 \times 10^{-3}$ to initialize $A^{-1}$ for LSTD
+        \State Initialize a relatively discount factor, e.g. $\gamma = 0.9$ 
+        \State Initialize a small constant $\lambda$, e.g. $1 \times 10^{-3}$ to initialize $A^{-1}$ for LSTD
         \State Given the number of actions as \(N_a\) and embedding dimension \(N_e\), initialize a matrix $\theta$ with shape $N_a \times N_e$
-        \State Initialize a tensor $A_a^{-1} = \lambda^{-1}I$ and a tensor $b_a=0$ to store the tensors that suffice $\theta_{a} = A_a^{-1} b_a$, $\forall a \in A$ at each time step $t$
+        \State Initialize a tensor $A^{-1} = \lambda^{-1}I$ with shape $N_a \times N_e \times N_e $ and a tensor $b$ with shape $N_a \times N_e$ full of zeros to store the tensors that suffice $\theta_{a} = A_a^{-1} b_a$, $\forall a \in A$
         \mycomment{A relatively large discount factor encourages long-term planning and faster convergence during training}
         \end{algorithmic}[1]
     \end{algorithm}
@@ -79,7 +80,7 @@
         \begin{algorithmic}[1]
             \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
             \State Unfreeze the weights of $\mathbf{A}$, i.e. \(w\)
-        \For {\(episode\) \(e_0 = 1\) to \(N_1\)}
+        \For {\(episode\) \(e_0 = 1\) to \(N_2\)}
             \State Repeat the same steps at the warm-up phase
             \For {each time step \(t\) = 1 to \(T\)}
                 \State Repeat the same steps at the warm-up phase
@@ -93,7 +94,7 @@
                 \
             \EndFor
         \EndFor
-        \State $e=e+N_1$
+        \State $e=e+N_2$
         \end{algorithmic}[1]
     \end{algorithm}
 
@@ -103,7 +104,7 @@
         \begin{algorithmic}[1]
             \State Freeze the weights of \(f(phi(s))\), i.e. $\theta$
             \State Unfreeze the weights of $\mathbf{A}$, i.e. \(w\)
-        \For {\(episode\) \(e_0 = 1\) to \(N_1\)}
+        \For {\(episode\) \(e_0 = 1\) to \(N_3\)}
             \State Repeat the same steps at the warm-up phase
             \For {each time step \(t\) = 1 to \(T\)}
                 \State Repeat the same steps at the warm-up phase
@@ -111,13 +112,13 @@
                 \mycomment{Start using the online LSTD algorithm to update $\theta$}
                 \State Calculate $\tau = \phi(s_t) - \gamma \phi(s_{t+1})$
                 \State Calculate $v = \tau^{T} A^{-1}$
-                \State Update $A^{-1} = A^{-1} - \frac{A^{-1} \phi(s) v^{T}}{1 + v \phi(s)}$
-                \State Update $b = b + r \phi(s)$
-                \State Given the action $a$ of the current time step, update $\theta_a = A^{-1} b $
+                \State Update $A_a^{-1} = A_a^{-1} - \frac{A_a^{-1} \phi(s) v^{T}}{1 + v \phi(s)}$
+                \State Update $b_a = b_a + r \phi(s)$
+                \State Given the action $a$ of the current time step, update $\theta_a = A_a^{-1} b_a $
                 \State Update state $s_t=s_{t+1}$
             \EndFor
         \EndFor
-        \State $e=e+N_1$
+        \State $e=e+N_3$
         \end{algorithmic}[1]    
     \end{algorithm}
 
@@ -127,15 +128,14 @@
         \caption{Training procedure}
         \begin{algorithmic}[1]
         \State Run \(Initialization\)
-        \While {\(episode\) $e \leq N$}
+        \For {each training cycle $c = 1$ to $\frac{N}{N_0}$}
             \State Run \(\textit{Warm-up phase}\)
+            \For {each intra-$c$ round $r=1$ to $\frac{N_0-N_1}{N_2+N_3}$}
             \State Run \(\textit{Autoencoder update phase}\)
-            \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
+            \State Reset $A^{-1}, b, \theta$ to the default value at the initialization phase
             \State Run \(\textit{LSTD update phase}\)
-            \State Run \(\textit{Autoencoder update phase}\)
-            \State Reset \(A_a^{-1}\) and \(b_a\) to the default value at the initialization phase, $\forall a \in A$ at each time step $t$
-            \State Run \(\textit{LSTD update phase}\)
-        \EndWhile
+            \EndFor
+        \EndFor
         \end{algorithmic}[1]    
     \end{algorithm}
     

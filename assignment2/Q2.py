@@ -297,13 +297,10 @@ class LSTD_DQL_learner():
             self.steps_done = 0
             self.run_warm_up_phase()
             self.run_eval_mode()
-            print(self.training_episode)
             for _ in range( int((self.N0- self.N1)/(self.N2 + self.N3)) ):
                 self.run_autoencoder_update_phase()
-                print(self.training_episode)
                 self.run_eval_mode()
                 self.run_LSTD_update_phase()
-                print(self.training_episode)
                 self.run_eval_mode()
 
 

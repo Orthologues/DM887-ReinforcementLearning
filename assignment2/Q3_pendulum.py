@@ -24,10 +24,10 @@ References
 # create a class "LSTD_DQL_pendulum_learner" inherited from "LSTD_DQL_learner" designed for the pendulum problem
 class LSTD_DQL_pendulum_learner(LSTD_DQL_learner):
 
-    def __init__(self, device: str, env_name: str, n_actions: int, encoding_dim: int, batch_size: int = 32, gamma: float = 0.9, lambda_val=0.001, alpha=0.01, epsilon=0.2, T=1000, N=1000, N0=100, N1=20, N2=5, N3=35, N_eval=5):
+    def __init__(self, device: str, env_name: str, n_actions: int, encoding_dim: int, batch_size: int = 32, gamma: float = 0.9, lambda_val=0.001, alpha=0.01, epsilon=0.2, T=1000, N=1000, N0=100, N1=10, N2=5, N3=40, N_eval=5):
         super().__init__(device, env_name, n_actions, encoding_dim, batch_size, gamma, lambda_val, alpha, epsilon, T, N, N0, N1, N2, N3, N_eval)
     
-        self.action_intervals = np.linspace(-2, 2, num=11)  # Creates 10 intervals
+        self.action_intervals = np.linspace(-2, 2, num=n_actions+1)  # Creates 100 intervals
         self.discretized_actions = (self.action_intervals[:-1] + self.action_intervals[1:]) / 2  # Medians of intervals
 
 
@@ -208,18 +208,15 @@ if __name__ == "__main__":
 
     ENV = namedtuple('env', ('name', 'n_actions', 'encoding_dim'))
 
-    # discretize the continuous space [-2, 2] into 10 equal intervals
-    env1 = ENV('Pendulum-v1', 10, 6) # 3x2, 3 is the number of observations in the env
-    env2 = ENV('Pendulum-v1', 10, 2) # 'encoding_dim' = math.ceil(3/2), 3 is the number of observations in the env
-    ENVS = [env1, env2]
+    # discretize the continuous space [-2, 2] into 100 equal intervals
+    env = ENV('Pendulum-v1', 100, 2) # 'encoding_dim' = math.ceil(3/2), 3 is the number of observations in the env
 
-    for idx, env in enumerate(ENVS):
-        learner = LSTD_DQL_pendulum_learner(
-            env_name=env.name, 
-            n_actions=env.n_actions, 
-            encoding_dim=env.encoding_dim, 
-            device=device
-        )
-        learner.run_training_cycle()
-        learner.plot_total_reward_mean_and_std(f"pendulum-{idx}")
+    learner = LSTD_DQL_pendulum_learner(
+        env_name=env.name, 
+        n_actions=env.n_actions, 
+        encoding_dim=env.encoding_dim, 
+        device=device
+    )
+    learner.run_training_cycle()
+    learner.plot_total_reward_mean_and_std("pendulum")
         

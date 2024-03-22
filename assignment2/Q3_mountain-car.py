@@ -26,17 +26,19 @@ if __name__ == "__main__":
 
     ENV = namedtuple('env', ('name', 'n_actions', 'encoding_dim'))
 
-    env1 = ENV('MountainCar-v0', 3, 4) # 'encoding_dim' = 2 * 2, 2 is the number of observations in the env
-    env2 = ENV('MountainCar-v0', 3, 1) # 'encoding_dim' = math.ceil(2/2), 2 is the number of observations in the env
-    ENVS = [env1, env2]
+    env = ENV('MountainCar-v0', 3, 1) # 'encoding_dim' = math.ceil(2/2), 2 is the number of observations in the env
     
-    for idx, env in enumerate(ENVS):
-        learner = LSTD_DQL_learner(
-            env_name=env.name, 
-            n_actions=env.n_actions, 
-            encoding_dim=env.encoding_dim, 
-            device=device
-        )
-        learner.run_training_cycle()
-        learner.plot_total_reward_mean_and_std(f"mountaincar-{idx}")
+    learner = LSTD_DQL_learner(
+        env_name=env.name, 
+        n_actions=env.n_actions, 
+        N = 2000,
+        N0 = 400,
+        N1 = 40, # number of warm-up episodes per cycle
+        N2 = 15, # number of autoencoder update episodes per cycle
+        N3 = 30, # number of LSTD
+        encoding_dim=env.encoding_dim, 
+        device=device,
+    )
+    learner.run_training_cycle()
+    learner.plot_total_reward_mean_and_std("mountaincar")
         
