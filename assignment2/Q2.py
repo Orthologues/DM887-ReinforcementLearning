@@ -192,7 +192,7 @@ class LSTD_DQL_learner():
     def get_reset_state(self):
         state, _ = self.env.reset()
         # torch.sigmoid is used for normalization
-        return torch.sigmoid(torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0))
+        return torch.sigmoid(torch.tensor(state, dtype=torch.float32, device=self.device))
 
 
     def reset_LSTD_weights(self):
@@ -215,7 +215,7 @@ class LSTD_DQL_learner():
                 if done:
                     break
  
-                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device))
                 self.mem.push(state)
                 state = next_state
 
@@ -236,7 +236,7 @@ class LSTD_DQL_learner():
                 if done:
                     break
  
-                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device))
                 self.mem.push(state)
                 state = next_state
                 self.optimize_autoencoder()
@@ -261,7 +261,7 @@ class LSTD_DQL_learner():
                 if done:
                     break
  
-                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device))
                 self.mem.push(state)
 
                 phi_s: torch.Tensor = self.get_phi_s(state)
@@ -333,7 +333,7 @@ class LSTD_DQL_learner():
                 if done:
                     break
 
-                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device))
                 state = next_state
 
             # when an evaluation episode ends, append the total reward to the list
