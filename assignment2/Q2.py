@@ -3,7 +3,6 @@
 import gymnasium as gym
 import math
 import random
-import matplotlib
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
@@ -11,7 +10,6 @@ from itertools import count
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 from typing import List, Tuple
 import numpy as np
 
@@ -193,8 +191,8 @@ class LSTD_DQL_learner():
 
     def get_reset_state(self):
         state, _ = self.env.reset()
-        # F.sigmoid is used for normalization
-        return F.sigmoid(torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0))
+        # torch.sigmoid is used for normalization
+        return torch.sigmoid(torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0))
 
 
     def reset_LSTD_weights(self):
@@ -217,7 +215,7 @@ class LSTD_DQL_learner():
                 if done:
                     break
  
-                next_state = F.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
                 self.mem.push(state)
                 state = next_state
 
@@ -238,7 +236,7 @@ class LSTD_DQL_learner():
                 if done:
                     break
  
-                next_state = F.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
                 self.mem.push(state)
                 state = next_state
                 self.optimize_autoencoder()
@@ -263,7 +261,7 @@ class LSTD_DQL_learner():
                 if done:
                     break
  
-                next_state = F.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
                 self.mem.push(state)
 
                 phi_s: torch.Tensor = self.get_phi_s(state)
@@ -335,7 +333,7 @@ class LSTD_DQL_learner():
                 if done:
                     break
 
-                next_state = F.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
+                next_state = torch.sigmoid(torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0))
                 state = next_state
 
             # when an evaluation episode ends, append the total reward to the list

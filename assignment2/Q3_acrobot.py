@@ -28,4 +28,5 @@ if __name__ == "__main__":
     env1 = ENV('Acrobot-v1', 3, 12) # 'encoding_dim' = 6x2, 6 is the number of observations in the env
     env2 = ENV('Acrobot-v1', 3, 3) # 'encoding_dim' = math.ceil(6/2), 6 is the number of observations in the env
     ENVS = [env1, env2]
-    
+
+

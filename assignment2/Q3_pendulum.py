@@ -59,9 +59,7 @@ class LSTD_DQL_pendulum_learner(LSTD_DQL_learner):
         # select a policy
         if rand_num < EPS_THRESHOLD:
             phi_s: torch.Tensor = self.get_phi_s(state)
-            result = torch.matmul(self.theta, phi_s.view(-1, 1))
-            result_squeezed = torch.squeeze(result, -1)  # Squeezing the last dimension
-            return torch.argmax(result_squeezed, dim=0)
+            return torch.argmax(self.Q_sa_2D_tensor(self.theta, phi_s), dim=0)
         
         return torch.tensor([[self.env.action_space.sample()]], device=self.device, dtype=torch.long)
 
