@@ -1,0 +1,276 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{amsthm}
+\DeclareMathOperator{\argmax}{argmax}
+\DeclareMathOperator{\argmin}{argmin}
+\setlength\parindent{0pt}
+\setlength{\topmargin}{-3cm}
+\setlength{\textheight}{24cm}
+
+% ready for submission
+\usepackage[final]{neurips_2023}
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc}    
+\usepackage{hyperref}       
+\usepackage{url}            
+\usepackage{booktabs}       
+\usepackage{amsfonts}       
+\usepackage{nicefrac}       
+\usepackage{microtype}      
+\usepackage{xcolor}         
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{caption}
+
+
+\newlength\myindent
+\setlength\myindent{2em}
+\newcommand\bindent{%
+  \begingroup
+  \setlength{\itemindent}{\myindent}
+  \addtolength{\algorithmicindent}{\myindent}
+}
+\newcommand\eindent{\endgroup}
+
+
+\title{Midway report of DM887 Final Project}
+
+\author{%
+  Jiawei Zhao, Kristóf Péter\\
+  Department of Mathematics and Computer Science\\
+  University of Southern Denmark\\
+  Moseskovvej, 5230 Odense \\
+  \texttt{jizha22@student.sdu.dk} \\
+  \texttt{krpet24@student.sdu.dk} \\
+}
+
+
+\begin{document}
+
+\maketitle
+
+
+\begin{abstract}
+  To implement the project in \textbf{learning to play Atari games with Bayesian Deep Expected SARSA}, we have attempted multiple baseline algorithms on Atari and non-Atari game environments at Gymnasium.
+  Currently, we are unable to improve the learning curve characterized by number of gradient descent (GD) time steps $t_{GD}$ at the X-axis and the total episode rewards $G$ at the y-axis at the experimented Atari environments.
+\end{abstract}
+
+\section{Summary of the experiments}
+We experimented with several different types of neural networks and environments:
+\begin{enumerate}
+    \item Only fully connected linear layers
+    \begin{enumerate}
+        \item Testing algorithms on the "CartPole-v1" environment.
+        \item Testing algorithms on the "ram" versions of Atari environments, for example "ALE/Breakout-ram-v5". Here the states are $128$ dimensional vectors.
+    \end{enumerate}
+    \item Convolutional Neural Network: For Atari environments with "rgb" state output. For example "ALE/Breakout-v5".
+    \begin{enumerate}
+        \item Using the original picture state output, which is an array with size $(210, 160, 3)$, where the first two numbers represent the dimensions of the picture, the last number represents the 3 different colors (red, green, blue) we have values for.
+        \item Transforming the original picture state output into a grayscale picture with dimensions $(210, 160)$ in hopes of simplifying the task and reducing training time.
+        \item Further transforming the grayscale picture to a (50, 50) in hopes further reducing training time.
+    \end{enumerate}
+    \item Fully connected linear layers are used as parameters in a Bayesian approach. There are two output layers instead of one. One is used as the mean, one as the standard deviation of the action values generated from the normal distribution.
+    \begin{enumerate}
+        \item In lack of sufficient computational resources, we tested it only on the "CartPole-v1" environment.
+    \end{enumerate}
+\end{enumerate}
+We also tried a few different versions of the Expected Sarsa algorithm:
+\begin{enumerate}
+    \item Softmax policy: Actions are taken according to a discrete distribution with the softmax function of the Q-values as the probabilities.
+    \item Epsilon greedy policy: Actions are taken randomly with $\epsilon$ probability, and according to the index of the largest Q-value with $1-\epsilon$ probability. Where $\epsilon$ decreases over time, as the agent explores the environment.
+    \item We are using two neural networks with the same architecture. A "policy" network for interacting with the environment and calculating the Q-values for the current state. This is the network updated using GD. The second network is the "target" network, which is used for calculating the expected Q-values for the next state, these values are used in the loss calculation alongside with the Q-values for the current state.
+\end{enumerate}
+
+\section{Implementation of the algorithms}
+
+We experimented on three baseline neural networks each taking the number of observations $N_{state}$ as the dimension of input, and the number of possible discrete actions $N_{action}$ as the dimension of output. \\
+At the \textbf{Atari} mode in \textit{CleanVersion.py}, the neural network $Q_1$ is used to train RGB or greyscale input states 
+e.g. \textit{ALE/Breakout-v5} or \textit{ALE/Tennis-v5}. 
+$Q_1$ consists of three convolutional layers each followed by a $ReLU$ activation function, 
+one fully-connected linear hidden layer followed by a $ReLU$ activation function, 
+and a fully-connected linear output layer. \\
+The implementation of $Q_1$ is elaborated at the first section of \textbf{Algorithm 1}.
+
+At the non-\textbf{Atari} mode in \textit{CleanVersion.py}, the neural network $Q_2$ is used to train vectorized input states 
+e.g. \textit{ALE/Breakout-v5} or \textit{ALE/Tennis-ram-v5}. 
+$Q_2$ consists of two fully-connected linear layers each followed by a $ReLU$ activation function, 
+and a fully-connected linear output layer. \\
+The implementation of $Q_2$ is elaborated at the second section of \textbf{Algorithm 1}.
+
+In \textit{BayesianVersion.py}, 
+a simplistic Bayesian neural network $Q_3$ is used. $Q_3$ consists of two fully-connected linear layers each followed by a $ReLU$ activation function, 
+followed by two parallel fully-connected linear output layers 
+to calculate the mean value and the standard deviation of the output the preceding layers. \\
+The implementation of $Q_3$ is elaborated at the third section of \textbf{Algorithm 1}.
+Subsequently, the major pseudo code blocks are stated at \textbf{Algorithm 2}. \\
+Pseudo code for the main loop of the current version of the Deep expected SARSA network is stated at \textbf{Algorithm 3}.
+
+\section{To-do list and a time plan of the remaining tasks}
+\begin{enumerate}
+    \item Perfect Bayesian Q-factor design for Atari games (in the coming two-three weeks)
+    \begin{enumerate}
+        \item Designing a more advanced Bayesian network. (The next two weeks)
+        \item Deciding on the best approach: Convolution networks with picture states or standard linear layers with vector states. (The next two weeks)
+        \item Designing a more advanced algorithm with more theoretical background for a Bayesian network as the Q-function. (The next two weeks)
+        \item Try our code in more environments and with other hyperparameters. (The next two-three weeks depending on our success)
+        \item Trials using more computing power. (Starting from next week.)
+        \item Writing pseudo-code for the finished algorithm using a Bayesian network (last weeks before project submission)
+    \end{enumerate}
+    \item Trying to figure out any possible issues with the current basic Expeceted Sarsa algorithm and finding the reason why it performs so poorly. (from now until the end of the project)
+    \begin{enumerate}
+        \item Extending and possibly correcting the current pseudo code. (from now until the end of the project)
+    \end{enumerate}
+    \item Comparing our code's performance to the state of the art.
+    \begin{enumerate}
+        \item Comparing to our own versions of DQN, DDQN, Soft Q-learning etc. (2-3 weeks from now, possibly sooner depending on our success with part $1$)
+        \item Comparing to other performances in research papers dealing with reinforcement learning applied to Atari games. (from now until the end of the project, but writing the documentation at the end)
+    \end{enumerate}
+    \item Trying different model update intervals. (From now until the end, as we experiment with different models.)
+    \item Flesh out limitations of our final code and propose further improvement opportunities. (last weeks before project submission)
+\end{enumerate}
+
+
+\begin{algorithm}
+
+  \caption{Deep expected SARSA Q-network $Q_1$, $Q_2$, and $Q_3$}
+
+  \begin{algorithmic}
+    
+    \State \textbf{Implementation of $Q_1$:}
+    \State Assign the size of the preprocessed flattened input tensor as $N_{input}$
+    \State Assign $N_{hidden} = 512$
+    \State Assign the number of possible discrete actions at the given Atari game environment as $N_{action}$
+    \\
+    \State First convolutional layer (input): (\textit{$N_{input}$, 32}) with a kernel size $N_{k1}=8$ and stride $N_{stride1}=4$
+    \State \textit{ReLU} activation
+    \State Second convolutional layer (hidden): (\textit{32, 64}) with a kernel size $N_{k2}=4$ and stride $N_{stride2}=2$
+    \State \textit{ReLU} activation
+    \State Third convolutional layer (hidden): (\textit{64, 128}) with a kernel size $N_{k3}=3$ and stride $N_{stride3}=1$
+    \State \textit{ReLU} activation
+    \State First fully-connected linear layer (hidden): ($128 \times N_{input}, N_{hidden}$)
+    \State \textit{ReLU} activation
+    \State Second fully-connected linear layer (output): ($N_{hidden}, N_{action}$)
+  
+  \end{algorithmic} 
+
+  \begin{algorithmic}
+    \State \textbf{Implementation of $Q_2$:}
+    \State Flatten the input state into a one-dimensional vector $V$, then assign the length of $V$ as $N_{input}$ 
+    \State Assign the number of possible discrete actions at the given Atari game environment as $N_{action}$
+    \\
+    \State First fully-connected linear layer (input): ($N_{input}, 128$)
+    \State Second fully-connected linear layer (hidden): ($128, 128$)
+    \State Third fully-connected linear layer (output): ($128, N_{action}$)
+  \end{algorithmic} 
+
+  \begin{algorithmic}
+    \State \textbf{Implementation of $Q_3$:}
+    \State Flatten the input state into a one-dimensional vector $V$, then assign the length of $V$ as $N_{input}$ 
+    \State Assign $N_{hidden} = 1024$
+    \State Assign the number of possible discrete actions at the given Atari game environment as $N_{action}$
+    \State Assign the sampling batch size $\mid {D'}\mid = 16$
+    \\
+    \State First fully-connected linear layer (input): ($N_{input}, N_{hidden}$)
+    \State Second fully-connected linear layer (hidden): ($N_{hidden}, N_{hidden}$)
+    \State A fully-connected linear layer calculating the mean $\mu_{D'}$ of the replay batch and yielding the first element of the output: ($N_{hidden}, N_{action}$)
+    \State A fully-connected linear layer calculating the stanard deviation $\sigma_{D'}$ of the replay batch and yielding the second element of the output: ($N_{hidden}, N_{action}$)
+
+  \end{algorithmic}
+
+\end{algorithm}
+
+\begin{algorithm}
+    \begin{algorithmic}[1]
+    \caption{Deep Expected Sarsa Methods}
+    \State \textbf{Create the Neural Network:}
+    \State Parameters from the environment: $number\;of\;actions$, $state\;dimension$
+    \State $action\;space$ = $\{0,1,\dots,number\;of\;actions\}$ for all environments we tested
+    %\State Layers: (\textit{state dimension}, hidden dimension), (hidden dimension, hidden dimension), (hidden dimension, \textit{action dimension})
+    %\State The Rectified Linear Unit activation function is used at every layer except for the last layer.
+    %\State The \textit{state dimension} is the dimensions of the state space of the environment
+    %\State The \textit{action dimension} is the dimensions of the action space of the environment
+    %\State The \textit{hidden dimension} is freely chosen
+    \State \textbf{Create a \textit{ReplayMemory}:}
+    \State The observed $(states,\;action,\;next\;state,\;reward)$ tuples are stored in the \textit{ReplayMemory}. Batches are sampled randomly from here.
+    \State \textbf{Specify parameters:}
+    \State Episode Number, Batch size, Learning rate for optimizer = $\gamma$, Learning rate for Expected Sarsa = $\alpha$, Loss\;function (Mean Squared Error or Huber Loss), Optimizer (Adam), Softmax function, epsilon decay values (epsilon, decay $\in(0,1)$), Constant for Polyak averaging = $\tau$, Policy Network = $Q$, Target Network = $Q'$, Policy Network Weights= $\theta$, Target Network Weights= $\theta'$
+    \newline
+    \State \underline{Define Policy Method($state$):}
+    %\State $state$ = input
+    \If{Using Softmax policy}
+        \State action probabilities = Softmax($Q(state)$)
+        \State return action $\sim$ DiscreteDistribution($action\;space$, action probabilities)
+    \ElsIf{Using Epsilon Greedy Policy}
+        Generate U $\sim$ Uniform$(0,1)$
+        \If{U > epsilon}
+            \State return $action$ = Argmax($Q(state)$)
+        \Else
+            \State return a uniformly random $action$ from $action\;space$
+        \EndIf
+    \EndIf
+    \newline
+    \State \underline{Define method for Preprocessing States($state$):}
+    %\State $state$ = input
+    \If{Using RGB}
+        \State $state$ from $(210,\;160,\;3)$ transformed to $(3,\;210,\;160)$ where the pixel values stay the same, only the structure of the array changes.
+    \ElsIf{Using Greyscale}
+        \State $state$ from $(210,\;160,\;3)$ transformed to $(1,\;210,\;160)$ where the pixel values for different colors are lost.
+        \If{Using further dimension reduction}:
+            \State $state$ from $(1,\;210,\;160)$ transformed to $(1,\;50,\;50)$ where the pixel values change according to the transformation.
+        \EndIf
+    \Else
+        \State $state$ is unchanged
+    \EndIf
+    \If{Testing on Atari games}
+        \State $state$ = $state/255$
+    \EndIf
+    \State return $state$
+    \newline
+    \State \underline{Define Optimization method and GD:}
+    \If{\textit{ReplayMemory} has too few observations}
+        \State do not do anything
+    \EndIf
+    \State $Batch\;size$ amount of $(state,\;action,\;nextstate,\;reward)$ tuples are sampled randomly from \textit{Replaymemory}.
+    \State We create $states,\;actions,\;nextstates,\;rewards$ vectors from the batch with matching coordinates.
+    \State StateQvalues = $Q(states)[actions]$, so we take the Q\;values for the actions in the batch at the matching coordinates
+    \State NextStateQvalues = $\underline{0}$
+    \For{action in $action\;space$}
+        \State NextStateQvalues +=
+        \State += $Q'(nextstates)[action]$ $\cdot$ Softmax($Q'(nextstates)$)$[action]$
+    \EndFor
+    \State ExpectedValues = $\alpha$*NextStateQvalues + $rewards$
+    \State Loss = Loss\;function(StateQvalues, ExpectedValues)
+    \State We use Optimizer(Loss, $\gamma$) to update the weights of $Q$ using GD.
+    \end{algorithmic}[1]
+\end{algorithm}
+\newpage
+
+\begin{algorithm}
+    \begin{algorithmic}[2]
+    \caption{Deep Expected Sarsa Main Loop}
+    \State \underline{Main Loop:}
+        \For {\(1,\dots,Episode Number\)}
+            \State $ state \gets reset\;environment$
+            \State \textbf{repeat}
+                \State $action$ $\gets$ Policy Method($state$)
+                \State step from $state$ with $action$
+                \State $state$ $\gets$ Preprocessing States($state$)
+                \State observe $nextstate,\;action,\;reward$ after step
+                \State $nextstate$ $\gets$ Preprocessing States($nextstate$)
+                \State record $(state,\;action,\;nextstate,\;reward)$ to \textit{ReplayMemory}
+                \State $state \gets nextstate$
+                \State Perform Optimization method and GD
+                \State Soft update the weights of $Q'$ with Polyak averaging:
+                    \State $\theta'$ $\gets$ $\tau$*$\theta$ + $(1-\tau)$*$\theta'$
+            \State \textbf{until episode end}
+            \If{Using Epsilon Greedy Policy Method}
+                \State epsilon $\gets$ epsilon $\cdot$ decay
+            \EndIf
+        \EndFor
+    \end{algorithmic}[1]
+\end{algorithm}
+
+
+\end{document}
