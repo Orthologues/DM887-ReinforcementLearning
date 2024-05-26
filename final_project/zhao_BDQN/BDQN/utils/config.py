@@ -15,7 +15,7 @@ class Config:
     BLR_POSTERIOR_UPDATE_FREQ = 5*10**4
     GD_UPDATE_FREQUENCY = 10 # gradient descent update frequency for the policy Q-network
     PRE_BLR_EXPLORATION_STEPS = 2 * 10**4
-    DISCOUNT = 0.99
+    DISCOUNT = 0.95
     ENV_NAME = 'ALE/Breakout-v5'
     CONV_BATCH_SIZE = 32
     STATE_WIDTH = 84
@@ -60,6 +60,7 @@ class Config:
         self.gd_update_frequency = Config.GD_UPDATE_FREQUENCY # number of time steps between gradient descent updates
         self.prior_variance = Config.SIGMA_VARIANCE 
         self.noise_variance = Config.NOISE_VARIANCE
+        self.gamma = Config.DISCOUNT
 
         """
         Other parameters related to time steps

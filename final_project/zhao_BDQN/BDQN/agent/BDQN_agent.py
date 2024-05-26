@@ -64,7 +64,7 @@ class BDQNAgent:
         # initialization of the three-dimensional tensor of $\phi(x)\phi(x)^\top$
         self.phi_phi_t = torch.zeros(self.num_actions, self.phi_size, self.phi_size)
         # initialization of the two-dimensional tensor of $\phi y$
-        self.phi_y = torch.zeros(self.num_actions, self.phi_size)
+        self.phi_qtarget = torch.zeros(self.num_actions, self.phi_size)
 
         # the flag to indicate whether to perform posterior update 
         self.if_posterior_update = False
@@ -79,9 +79,9 @@ class BDQNAgent:
 
 
     def posterior_update(self):
-        # reset self.phi_phi_t and self.phi_y to zero
+        # reset self.phi_phi_t and self.phi_qtarget to zero
         self.phi_phi_t *= 0
-        self.phi_y *= 0
+        self.phi_qtarget *= 0
 
         if self.total_t_steps > self.config.pre_blr_update_t_steps:
             batch_size = Config.CONV_BATCH_SIZE
@@ -101,8 +101,31 @@ class BDQNAgent:
                 batch_of_done_flags: Tuple[bool] = (el.done for el in batch_of_transitions)
 
                 with torch.no_grad():
-                    # compute the Q-values of the next states
-                    policy_state_phi, expected_q_target = self.extract_state_phi(batch_of_states, batch_of_actions, batch_of_rewards, batch_of_next_states, batch_of_done_flags)
+                    """
+                    compute the Q-values of the next states
+                    shape of $batch_of_next_states_phi: (32, 512)
+                    shape of $expected_q_target: (32, )
+                    """
+                    policy_state_phi, expected_q_target = self.extract_state_phi(batch_of_states, batch_of_rewards, batch_of_next_states, batch_of_done_flags)
+                
+                                # can improve by not using a loop
+                for i in range(batch_size):
+                    action = batch_of_actions[i]
+                    self.phi_phi_t[action] += torch.matmul(policy_state_phi[i].unsqueeze(0).T, policy_state_phi[i].unsqueeze(0))
+                    self.phi_qtarget[action] += policy_state_phi[i] * expected_q_target[i].item()
+
+                
+                for i in range(self.num_actions):
+                    """
+                    size of $inv: (512, 512)
+                    """
+                    inv = torch.inverse( self.phi_phi_t[i]/self.noise_variance + 1/self.prior_variance * torch.eye(self.phi_size) )
+                    self.policy_mean[i] = torch.matmul(inv, self.phi_qtarget[i]) / self.noise_variance
+                    self.policy_cov[i] = self.prior_variance * inv
+                    try:
+                        self.policy_cov_decom[i] = torch.linalg.cholesky((self.policy_cov[i]+self.policy_cov[i].T)/2)
+                    except RuntimeError:
+                        pass
 
 
     def thompson_sample(self):
@@ -118,35 +141,34 @@ class BDQNAgent:
         self.policy_mean = self.thompson_sampled_mean.clone().detach()
     
 
-    """
-    
-    """
-    def extract_state_phi(self, batch_of_states: Tensor, batch_of_actions: Tuple[int], batch_of_rewards: Tuple[float], batch_of_next_states: Tensor, batch_of_done_flags: Tuple[bool]):
+    def extract_state_phi(self, batch_of_states: Tensor, batch_of_rewards: Tuple[float], batch_of_next_states: Tensor, batch_of_done_flags: Tuple[bool]) -> Tuple[Tensor, Tensor]:
         
+        batch_of_masks = tuple([1 if el == True else 0 for el in batch_of_done_flags])
+
+        """
+        shape of $batch_of_states_phi: (32, 512)
+        shape of $batch_of_next_states_phi: (32, 512)
+        """
         with torch.no_grad():
+            batch_of_states_phi = self.policy_network(batch_of_states)
+            batch_of_next_states_phi_policy = self.policy_network(batch_of_next_states)
+            batch_of_next_states_phi_target = self.target_network(batch_of_next_states)
+            # calculate the expected Q-value of the next states using the target Q mean values
             """
-            shape of batch_of_states_phi: (32, 512)
-            shape of batch_of_next_states_phi: (32, 512)
+            shape of $batch_of_q_next: (32, self.num_actions)
+            shape of $batch_of_prob_actions: (32, self.num_actions)
+            shape of $batch_of_target_q_next: (32, self.num_actions)
+            shape of $batch_of_expected_q_target_next: (32,)
             """
-            with torch.no_grad():
-                batch_of_states_phi = self.policy_network(batch_of_states)
-                batch_of_next_states_phi_policy = self.policy_network(batch_of_next_states)
-                batch_of_next_states_phi_target = self.target_network(batch_of_next_states)
-                # calculate the expected Q-value of the next states using the target Q mean values
-                """
-                shape of $batch_of_q_next: (32, self.num_actions)
-                shape of $batch_of_prob_actions: (32, self.num_actions)
-                shape of $batch_of_target_q_next: (32, self.num_actions)
-                shape of $expected_batch_q_next: (32,)
-                """
-                batch_of_q_next = torch.matmul(batch_of_next_states_phi_policy, self.policy_mean.T).detach()
-                # use the softmax function to infer the probablity of each action to calculate the expected Q_next
-                batch_of_prob_actions = nn.functional.softmax(batch_of_q_next, dim=1)
-                
-                batch_of_target_q_next = torch.matmul(batch_of_next_states_phi_target, self.target_mean.T).detach()
-                expected_batch_q_next = torch.sum(batch_of_prob_actions * batch_of_target_q_next, dim=1)
+            batch_of_q_next = torch.matmul(batch_of_next_states_phi_policy, self.policy_mean.T).detach()
+            # use the softmax function to infer the probablity of each action to calculate the expected Q_next
+            batch_of_prob_actions = nn.functional.softmax(batch_of_q_next, dim=1)
             
-            return batch_of_states_phi, expected_batch_q_next
+            batch_of_target_q_next = torch.matmul(batch_of_next_states_phi_target, self.target_mean.T).detach()
+            batch_of_expected_q_target_next = tensor(batch_of_rewards) + self.config.gamma * (torch.ones((Config.CONV_BATCH_SIZE)) - tensor(batch_of_masks)) * torch.sum(batch_of_prob_actions * batch_of_target_q_next, dim=1)
+            
+
+        return batch_of_states_phi, batch_of_expected_q_target_next
 
 
 
@@ -163,4 +185,4 @@ class BDQNAgent:
         prob_actions = nn.functional.softmax(q_actions, dim=0)
 
         action: int = torch.multinomial(prob_actions, 1)[0].item() if self.use_softmax_policy else torch.argmax(q_actions).item()
-        return action
+        return int(action)
