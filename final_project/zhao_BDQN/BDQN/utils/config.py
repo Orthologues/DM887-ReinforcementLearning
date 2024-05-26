@@ -28,6 +28,7 @@ class Config:
     CONV_NETWORK = lambda input_dim: BdqnConvNet(input_dim)
     SIGMA_VARIANCE = 0.001
     NOISE_VARIANCE = 1
+    USE_SOFTMAX_POLICY = False
 
     def __init__(self, env_name=ENV_NAME) -> None:
 

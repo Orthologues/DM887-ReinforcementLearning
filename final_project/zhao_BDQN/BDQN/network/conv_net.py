@@ -19,12 +19,12 @@ class BdqnConvNet(nn.Module):
 
     def init_body(self, input_dim, output_dim, num_filters) -> None:
         """
-        Desired input shape: (32, 4, 84, 84)
-        Output Shape 1: (32,32,20,20)
-        Output Shape 2: (32,64,9,9)
-        Output Shape 3: (32,64,7,7)
-        Input Shape 4 (after flattening): (32,3136) # 3136=7*7*64
-        Output Shape 4: (32, 512)
+        Desired input shape: (batch_size, 4, 84, 84)
+        Output Shape 1: (batch_size,32,20,20)
+        Output Shape 2: (batch_size,64,9,9)
+        Output Shape 3: (batch_size,64,7,7)
+        Input Shape 4 (after flattening): (batch_size,3136) # 3136=7*7*64
+        Output Shape 4: (batch_size, 512)
         """
         # the 1th layer of the feature extractor (convolutional)
         self.conv1 = self.init_layer(nn.Conv2d(in_channels=input_dim[1], out_channels=num_filters, kernel_size=8, stride=4))
@@ -37,16 +37,16 @@ class BdqnConvNet(nn.Module):
         self.bn3 = nn.BatchNorm2d(num_filters*2) # batch normalization for the output of conv layer 3
 
         # the 4th layer of the feature extractor (linear)
-        self.fc4 = self.init_layer(nn.Linear(7 * 7 * 64, output_dim))
+        self.fc4 = self.init_layer(nn.Linear(7 * 7 * num_filters * 2, output_dim))
 
 
-    def init_layer(layer: nn.Module) -> nn.Module:
+    def init_layer(self, layer: nn.Module) -> nn.Module:
         nn.init.orthogonal_(layer.weight.data)
         nn.init.constant_(layer.bias.data, 0)
         return layer
     
 
-    def forward(self, x: Tensor):
+    def forward(self, x: Tensor) -> Tensor:
         x = relu(self.bn1(self.conv1(x)))
         x = relu(self.bn2(self.conv2(x)))
         x = relu(self.bn3(self.conv3(x)))
