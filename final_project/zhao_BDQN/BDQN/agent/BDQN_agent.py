@@ -74,7 +74,9 @@ class BDQNAgent:
 
         # episodal attributes during episodal interactions between the agent and the environment 
         self.episodal_clipped_reward = 0
+        self.total_clipped_reward = 0
         self.episodal_reward = 0
+        self.total_reward = 0
         self.num_skipped_frames = 4 if config.skip_frames else None
 
 

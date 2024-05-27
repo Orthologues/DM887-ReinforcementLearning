@@ -20,7 +20,6 @@ class Config:
     WARMUP_STEPS = 5 * 10**3
     THOMPSON_SAMPLING_INTERVAL = 100
     DISCOUNT = 0.95
-    ENV_NAME = 'ALE/Breakout-v5'
     CONV_BATCH_SIZE = 32
     STATE_WIDTH = 84
     STATE_HEIGHT = 84
@@ -37,10 +36,11 @@ class Config:
     FRAMES_TO_SKIP = 4
     MAX_EPISODAL_TIME_STEPS = 5 * 10**2 
     MAX_BLR_BATCH_SIZE = 5 * 10**4
+    MAX_TRAINING_EPISODE = 1000
     REPLAY_SIZE = 10**4
     CLIP_REWARDS = False
 
-    def __init__(self, env_name=ENV_NAME, use_max_episodal_t_steps = True) -> None:
+    def __init__(self, env_name: str, use_max_episodal_t_steps = True) -> None:
 
         self.arg_parser = ArgumentParser()
 
@@ -69,6 +69,7 @@ class Config:
 
         # params for Q-network update
         self.num_warmup_t_steps = Config.WARMUP_STEPS # Number of time steps without any posterior update or gradient descent 
+        self.num_training_episodes = Config.MAX_TRAINING_EPISODE # the number of training episodes
         self.sampling_interval = Config.THOMPSON_SAMPLING_INTERVAL
         self.target_network_update_interval = Config.TARGET_NETWORK_UPDATE_INTERVAL
         self.target_weight_update_interval = Config.TARGET_WEIGHT_UPDATE_INTERVAL        
