@@ -10,8 +10,12 @@ from ..network import *
 class Config:
     
     DEVICE = "cuda:0"
-    TARGET_NETWORK_UPDATE_INTERVAL = 5*10**3
-    POSTERIOR_UPDATE_INTERVAL = 5*10**4
+    """
+    The frequency of a posterior update is 
+    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/2000
+    """
+    TARGET_NETWORK_UPDATE_INTERVAL = 5 * 10**2
+    TARGET_WEIGHT_UPDATE_INTERVAL = 4
     GD_UPDATE_INTERVAL = 10 # gradient descent update frequency for the policy Q-network
     WARMUP_STEPS = 5 * 10**3
     THOMPSON_SAMPLING_INTERVAL = 100
@@ -32,7 +36,7 @@ class Config:
     SKIP_FRAMES = False
     FRAMES_TO_SKIP = 4
     MAX_EPISODAL_TIME_STEPS = 5 * 10**2 
-    MAX_BLR_BATCH_SIZE = 2 * 10**4
+    MAX_BLR_BATCH_SIZE = 5 * 10**4
     REPLAY_SIZE = 10**4
     CLIP_REWARDS = False
 
@@ -66,14 +70,14 @@ class Config:
         # params for Q-network update
         self.num_warmup_t_steps = Config.WARMUP_STEPS # Number of time steps without any posterior update or gradient descent 
         self.sampling_interval = Config.THOMPSON_SAMPLING_INTERVAL
-        self.target_network_update_interval = Config.TARGET_NETWORK_UPDATE_INTERVAL        
+        self.target_network_update_interval = Config.TARGET_NETWORK_UPDATE_INTERVAL
+        self.target_weight_update_interval = Config.TARGET_WEIGHT_UPDATE_INTERVAL        
         self.gd_update_interval = Config.GD_UPDATE_INTERVAL # number of time steps between gradient descent updates
         self.prior_variance = Config.SIGMA_VARIANCE 
         self.noise_variance = Config.NOISE_VARIANCE
         self.gamma = Config.DISCOUNT
         self.max_posterior_update_batch_size = Config.MAX_BLR_BATCH_SIZE
         self.clip_rewards = Config.CLIP_REWARDS
-        self.blr_learn_interval = Config.POSTERIOR_UPDATE_INTERVAL # the frequency of doing posterior update to the bayesian linear regression layer (BLR)
         self.batch_size = Config.CONV_BATCH_SIZE # batch size for the DQN
         self.loss_function = torch.nn.MSELoss()
 

@@ -70,6 +70,7 @@ class BDQNAgent:
         self.total_non_warmup_t_steps = 0
         self.total_gd_t_times = 0 # total number of gradient descent time steps
         self.episodal_t_steps = 0
+        self.target_network_update_count_per_target_weight_update = 0
 
         # episodal attributes during episodal interactions between the agent and the environment 
         self.episodal_clipped_reward = 0
@@ -321,7 +322,9 @@ class BDQNAgent:
 
         while True: 
             if self.config.max_t_steps_per_episode is not None:
-                if self.episodal_t_steps >= self.config.max_t_steps_per_episode: break
+                if self.episodal_t_steps >= self.config.max_t_steps_per_episode: 
+                    print(f"max t steps per episode {self.config.max_t_steps_per_episode} reached")
+                    break
 
             states = next_states
             action = self.select_action(states)
@@ -336,7 +339,13 @@ class BDQNAgent:
             )
             self.total_t_steps += 1
             self.episodal_t_steps += 1
-            if done: break
+            if done: 
+                print(f"episodal reward: {self.episodal_reward}, 
+                        clipped reward: {self.episodal_clipped_reward}, 
+                        episodal time steps: {self.episodal_t_steps},
+                        total time steps: {self.total_t_steps},
+                        total gradient descent time steps: {self.total_gd_t_times}")
+                break
 
             # update the network
             if self.total_t_steps > self.config.num_warmup_t_steps:
@@ -349,4 +358,15 @@ class BDQNAgent:
                     self.optimizer_policy_network()
                     self.total_gd_t_times +=1
             
-            # save the model, update the target network and perform posterior update if necessary
+                # update the target network when necessary
+                if self.total_t_steps % self.config.target_network_update_interval == 0:
+                    # update the weights and biases of the target network
+                    self.target_network.load_state_dict(self.policy_network.state_dict())
+                    self.target_network_update_count_per_target_weight_update += 1
+                    # update the weight and covariance matrices of the target Q values
+                    if self.target_network_update_count_per_target_weight_update == self.config.target_weight_update_interval:
+                         self.posterior_update()
+                         self.target_mean = self.policy_mean()
+                         self.target_cov = self.policy_cov()
+                         self.target_network_update_count_per_target_weight_update = 0
+            
