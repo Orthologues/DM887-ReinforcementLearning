@@ -9,11 +9,12 @@ from ..network import *
 
 class Config:
     
-    DEVICE = torch.device("cuda:0") 
-    TARGET_NETWORK_UPDATE_FREQ = 5*10**3
-    BLR_POSTERIOR_UPDATE_FREQ = 5*10**4
-    GD_UPDATE_FREQUENCY = 10 # gradient descent update frequency for the policy Q-network
-    PRE_BLR_EXPLORATION_STEPS = 2 * 10**4
+    DEVICE = "cuda:0"
+    TARGET_NETWORK_UPDATE_INTERVAL = 5*10**3
+    BLR_POSTERIOR_UPDATE_INTERVAL = 5*10**4
+    GD_UPDATE_INTERVAL = 10 # gradient descent update frequency for the policy Q-network
+    WARMUP_STEPS = 5 * 10**3
+    THOMPSON_SAMPLING_INTERVAL = 100
     DISCOUNT = 0.95
     ENV_NAME = 'ALE/Breakout-v5'
     CONV_BATCH_SIZE = 32
@@ -31,6 +32,8 @@ class Config:
     SKIP_FRAMES = False
     FRAMES_TO_SKIP = 4
     MAX_EPISODAL_TIME_STEPS = 5 * 10**2 
+    MAX_BLR_BATCH_SIZE = 2 * 10**4
+    REPLAY_SIZE = 10**4
 
     def __init__(self, env_name=ENV_NAME, use_max_episodal_t_steps = True) -> None:
 
@@ -45,37 +48,37 @@ class Config:
         self.set_eval_env()
         self.skip_frames = False
         self.max_t_steps_per_episode = Config.MAX_EPISODAL_TIME_STEPS if use_max_episodal_t_steps else None
+        self.device = torch.device(Config.DEVICE)
 
         # classes/methods
         self.network_fn = Config.CONV_NETWORK # Convolutional neural network for Q-learning
         self.replay_fn = Config.REPLAY_BUFFER # Replay function
         self.conv_optimizer_fn = Config.DEFAULT_OPTIMIZER_FN # Optimizer for the convolutional neural network 
-        self.replay_fn = Config.REPLAY_BUFFER # Replay function
+        self.replay_memory_size = Config.REPLAY_SIZE # Replay function
 
         # normalizers for the input batch of tensors tensor of the convolutional neural network
-        self.state_normalizer = AtariImageNormalizer() # normalizer for the state, i.e., the input tensors of Atari games
+        self.state_normalizer = AtariImageNormalizer(device=self.device) # normalizer for the state, i.e., the input tensors of Atari games
 
         # normalizers for the agent exploration
         self.reward_normalizer = SignNormalizer() # normalizer for the reward
 
         # params for Q-network update
-        self.pre_blr_update_t_steps = Config.PRE_BLR_EXPLORATION_STEPS # Number of time steps without any posterior update
-        self.target_network_update_freq = Config.TARGET_NETWORK_UPDATE_FREQ        
-        self.gd_update_frequency = Config.GD_UPDATE_FREQUENCY # number of time steps between gradient descent updates
+        self.num_warmup_t_steps = Config.WARMUP_STEPS # Number of time steps without any posterior update or gradient descent 
+        self.sampling_interval = Config.THOMPSON_SAMPLING_INTERVAL
+        self.target_network_update_interval = Config.TARGET_NETWORK_UPDATE_INTERVAL        
+        self.gd_update_interval = Config.GD_UPDATE_INTERVAL # number of time steps between gradient descent updates
         self.prior_variance = Config.SIGMA_VARIANCE 
         self.noise_variance = Config.NOISE_VARIANCE
         self.gamma = Config.DISCOUNT
+        self.max_posterior_update_batch_size = Config.MAX_BLR_BATCH_SIZE
 
         """
-        Other parameters related to time steps
+        Other parameters
         """
-        # evaluation interval
         self.eval_interval = 2e5
         self.eval_episodes = 10 # number of episodes to evaluate per $self.eval_interval time steps
-        self.n_step = 1 # total number of time steps of the agent
-        self.gd_step = 0 # total number of gradient descent time steps of policy Q-network
 
-        self.blr_learn_frequency = Config.BLR_POSTERIOR_UPDATE_FREQ # the frequency of doing posterior update to the bayesian linear regression layer (BLR)
+        self.blr_learn_interval = Config.BLR_POSTERIOR_UPDATE_INTERVAL # the frequency of doing posterior update to the bayesian linear regression layer (BLR)
 
 
     @property

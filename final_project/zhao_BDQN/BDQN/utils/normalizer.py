@@ -1,5 +1,5 @@
 import numpy as np
-from torch import Tensor, nn, tensor, cat as concat_tensors
+from torch import DeviceObjType, Tensor, nn, tensor, cat as concat_tensors
 from typing import Tuple, List, Union, Any, Dict
 from ..utils import Config
 
@@ -98,8 +98,8 @@ class RescalingNormalizer(BaseNormalizer):
         self.coef = coef
 
     def __call__(self, x):
-        if not isinstance(x, Tensor):
-            x = np.asarray
+        if isinstance(x, Tensor):
+            x = np.asarray(x.cpu())
         return self.coef * x
     
 
@@ -110,12 +110,13 @@ How to use it:
 2. __call__ method: normalized_state = self.normalizer(stack_of_processed_states, new_atari_state)
 """
 class AtariImageNormalizer(RescalingNormalizer):
-    def __init__(self, width = Config.STATE_WIDTH, height = Config.STATE_HEIGHT, frame_stack_size=Config.REPLAY_HISTORY_LENGTH, coef = 1.0 / 255, rbg2greyscale=True):
+    def __init__(self, device: DeviceObjType, width = Config.STATE_WIDTH, height = Config.STATE_HEIGHT, frame_stack_size=Config.REPLAY_HISTORY_LENGTH, coef = 1.0 / 255, rbg2greyscale=True):
         super().__init__(coef)
         self.frame_stack_size = frame_stack_size
         self.width = width
         self.height = height
         self.rbg2greyscale = rbg2greyscale
+        self.device = device
     
 
     """
@@ -133,7 +134,7 @@ class AtariImageNormalizer(RescalingNormalizer):
             raise NotImplementedError("The Atari state frame must have a shape of (210, 160, 3)!")
 
         # $new_frame has a shape as (210, 160, 3), therefore, reshaping is necessary
-        x = tensor(new_frame).permute(3, 1, 2)
+        x = tensor(new_frame).permute(3, 1, 2).detach().to(self.device)
         x = super().__call__(x)
         if self.rbg2greyscale:
             # Convert RGB to grayscale

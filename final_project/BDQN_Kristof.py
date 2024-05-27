@@ -310,17 +310,13 @@ class BDQN_Learner():
         state = self.preprocess(next_frame, initial_state=True)
         t = 0.
         done = False
-
+ 
         while not done:
             #mx.nd.waitall()
             previous_state = state
             # show the frame
-            self.renderimage(next_frame)
-            sample = random.random()
             if self.frame_counter > self.replay_start_size:
                 self.annealing_count += 1
-            #if self.frame_counter == self.replay_start_size:
-                #self.logging.error('annealing and laerning are started ')
 
             action = self.select_action(state)
 

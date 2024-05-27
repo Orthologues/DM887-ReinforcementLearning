@@ -6,7 +6,7 @@ class ReplayMemory(object):
     """
     By default, Transitions.states would be of type torch.Tensor and shape (1, 4, 84, 84)
     """
-    Transitions = namedtuple('Transitions',('states', 'actions', 'rewards', 'next_states', 'done'))
+    Transitions = namedtuple('Transitions',('states', 'action', 'reward', 'next_states', 'done'))
 
     def __init__(self, capacity):
         self.memory = deque([], maxlen=capacity)
