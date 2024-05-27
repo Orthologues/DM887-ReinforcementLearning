@@ -117,6 +117,13 @@ class AtariImageNormalizer(RescalingNormalizer):
         self.height = height
         self.rbg2greyscale = rbg2greyscale
     
+
+    """
+    @param stack_of_frames: torch.Tensor 
+        desired stack_of_frames.shape = (4, 84, 84)
+    @param state: numpy.ndarray
+        desired state.shape = (210, 160, 3)
+    """
     def __call__(self, stack_of_frames: Tensor, new_frame: np.ndarray) -> Tensor:
         
         if not tuple(stack_of_frames.shape) == (self.frame_stack_size, self.width, self.height):

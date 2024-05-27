@@ -18,16 +18,15 @@ class BDQNAgent:
     def __init__(self, config: Config):
         # configuration of the agent
         self.config = config
+        self.env = config.eval_env()
         
         # attributes related to the states/actions
         self.num_actions = config.action_count
         self.phi_size = BdqnConvNet.FEATURE_DIM
-        self.state_processor = config.state_normalizer
         self.use_softmax_policy = Config.USE_SOFTMAX_POLICY
 
         # global attributes
         self.replay = config.replay_fn(BDQNAgent.REPLAY_SIZE)
-
         self.policy_network: BdqnConvNet = config.network_fn((Config.CONV_BATCH_SIZE, Config.REPLAY_HISTORY_LENGTH, config.STATE_WIDTH, Config.STATE_HEIGHT))
         self.target_network: BdqnConvNet = config.network_fn((Config.CONV_BATCH_SIZE, Config.REPLAY_HISTORY_LENGTH, config.STATE_WIDTH, Config.STATE_HEIGHT))
 
@@ -69,6 +68,7 @@ class BDQNAgent:
         # the flag to indicate whether to perform posterior update 
         self.if_posterior_update = False
 
+
         # copy the state of policy network to initialize the target network
         self.target_network.load_state_dict(self.policy_network.state_dict())
 
@@ -77,8 +77,13 @@ class BDQNAgent:
         self.episodal_t_steps = 0
         self.num_episode = 0
 
+        # episodal attributes during episodal interactions between the agent and the environment 
+        self.episodal_clipped_reward = 0
+        self.episodal_reward = 0
+        self.num_skipped_frames = 4 if config.skip_frames else None
 
-    def posterior_update(self):
+
+    def posterior_update(self) -> None:
         # reset self.phi_phi_t and self.phi_qtarget to zero
         self.phi_phi_t *= 0
         self.phi_qtarget *= 0
@@ -94,10 +99,10 @@ class BDQNAgent:
                 """
                 Transitions.states shall be of shape (4, 84, 84)
                 """
-                batch_of_states: Tensor = torch.cat([el.states for el in batch_of_transitions], dim=0)
+                batch_of_states: torch.Tensor = torch.cat([el.states for el in batch_of_transitions], dim=0)
                 batch_of_actions: Tuple[int] = (el.actions for el in batch_of_transitions)
                 batch_of_rewards: Tuple[float] = (el.rewards for el in batch_of_transitions)
-                batch_of_next_states: Tensor = torch.cat([el.next_states for el in batch_of_transitions], dim=0)
+                batch_of_next_states: torch.Tensor = torch.cat([el.next_states for el in batch_of_transitions], dim=0)
                 batch_of_done_flags: Tuple[bool] = (el.done for el in batch_of_transitions)
 
                 with torch.no_grad():
@@ -128,7 +133,7 @@ class BDQNAgent:
                         pass
 
 
-    def thompson_sample(self):
+    def thompson_sample(self) -> None:
         for i in range(self.num_actions):
             # gene
             sample = tensor(torch.normal(0, 1, size=(self.phi_size, 1)))
@@ -141,7 +146,17 @@ class BDQNAgent:
         self.policy_mean = self.thompson_sampled_mean.clone().detach()
     
 
-    def extract_state_phi(self, batch_of_states: Tensor, batch_of_rewards: Tuple[float], batch_of_next_states: Tensor, batch_of_done_flags: Tuple[bool]) -> Tuple[Tensor, Tensor]:
+    """
+    @param batch_of_states: torch.Tensor
+        desired batch_of_states.shape: (32, 4, 84, 84)
+    @param batch_of_rewards: Tuple[float]
+        desired batch_of_rewards.__len__(): 32
+    @param batch_of_next_states: torch.Tensor
+        desired batch_of_next_states.shape: (32, 4, 84, 84)
+    @param batch_of_done_flags: Tuple[bool]
+        desired batch_of_done_flags.__len__(): 32
+    """
+    def extract_state_phi(self, batch_of_states: torch.Tensor, batch_of_rewards: Tuple[float], batch_of_next_states: torch.Tensor, batch_of_done_flags: Tuple[bool]) -> Tuple[Tensor, Tensor]:
         
         batch_of_masks = tuple([1 if el == True else 0 for el in batch_of_done_flags])
 
@@ -171,13 +186,11 @@ class BDQNAgent:
         return batch_of_states_phi, batch_of_expected_q_target_next
 
 
-
-
     """
     @param atari_state: the preprocessed current state of the environment (torch.Tensor)
     desired atari_state.shape: (4, 84, 84)
     """
-    def select_action(self, atari_states: Tensor) -> int:
+    def select_action(self, atari_states: torch.Tensor) -> int:
         # reshape $atari_state to (1, 4, 84, 84)
         atari_states = atari_states.unsqueeze(0)
         # output shape of $action_vector: (self.num_actions) 
@@ -186,3 +199,77 @@ class BDQNAgent:
 
         action: int = torch.multinomial(prob_actions, 1)[0].item() if self.use_softmax_policy else torch.argmax(q_actions).item()
         return int(action)
+    
+
+    """
+    @param action: int (range(0, self.num_actions)) 
+    @param stacked_states: torch.Tensor
+        desired stacked_states.shape: (4, 84, 84)
+    """
+    def act_without_frame_skipping(self, action: int, stacked_states: torch.Tensor) -> Tuple[torch.Tensor, int, int, bool]:
+        
+        next_frame, reward, terminated, truncated, _ = self.config.eval_env.step(action)
+        done = terminated or truncated
+        self.episodal_t_steps = 0 if done else self.episodal_t_steps + 1
+        
+        clipped_reward = self.config.reward_normalizer(reward)
+        self.episodal_reward += reward
+        self.episodal_clipped_reward += clipped_reward
+        
+        if self.config.max_t_steps_per_episode is not None:
+            if self.episodal_t_steps == self.config.max_t_steps_per_episode:
+                done = True
+                self.episodal_t_steps = 0
+        
+        new_stacked_states = self.config.state_normalizer(stacked_states, next_frame)
+
+        return new_stacked_states, reward, clipped_reward, done
+
+
+    """
+    @param action: int (range(0, self.num_actions)) 
+    @param state: torch.Tensor
+        desired stacked_states.shape: (4, 84, 84)
+    """
+    def act_with_frame_skipping(self, action: int, stacked_states: torch.Tensor) -> Tuple[torch.Tensor, int, int, bool]:
+        
+        rewards = 0
+        clipped_rewards = 0
+        
+        for _ in range(self.num_skipped_frames - 1):
+            _, reward, terminated, truncated, _ = self.config.eval_env.step(action)
+            done = terminated or truncated
+            rewards += reward    
+            clipped_rewards += self.config.reward_normalizer(reward)
+            self.episodal_t_steps = 0 if done else self.episodal_t_steps + 1
+            if done:
+                return stacked_states, rewards, clipped_rewards, done
+        
+        # add the non-skipped frame into $new_stacked_states
+        next_frame, reward, terminated, truncated, _ = self.config.eval_env.step(action)
+        done = terminated or truncated
+        self.episodal_t_steps = 0 if done else self.episodal_t_steps + 1
+        
+        rewards += reward
+        clipped_rewards += self.config.reward_normalizer(reward)
+
+        self.episodal_reward += rewards 
+        self.episodal_clipped_reward += clipped_rewards
+        
+        if self.config.max_t_steps_per_episode is not None:
+            if self.episodal_t_steps == self.config.max_t_steps_per_episode:
+                done = True
+                self.episodal_t_steps = 0
+        
+        new_stacked_states = self.config.state_normalizer(stacked_states, next_frame)
+
+        return new_stacked_states, rewards, clipped_rewards, done
+    
+
+    """
+    @param action: int (range(0, self.num_actions)) 
+    @param state: torch.Tensor
+        desired stacked_states.shape: (4, 84, 84)
+    """
+    def act_in_env(self, action, state) -> Tuple[torch.Tensor, int, int, bool]:
+        return self.act_with_frame_skipping(action, state) if self.config.skip_frames else self.act_without_frame_skipping(action, state)

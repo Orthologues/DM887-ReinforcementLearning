@@ -205,8 +205,7 @@ class BDQN_Learner():
         else:
             return 0
 
-    def renderimage(self, next_frame):
-        return
+
     def preprocess(self, raw_frame, currentState=None, initial_state=False):
         raw_frame = torch.tensor(raw_frame, dtype=torch.float32)
         raw_frame = torch.reshape(torch.mean(raw_frame, dim=2, dtype=torch.float32),
@@ -240,7 +239,6 @@ class BDQN_Learner():
         for skip in range(self.skip_frame - 1):
             next_frame, reward, terminated, truncated, _ = self.env.step(action)
             done = terminated or truncated
-            self.renderimage(next_frame)
             self.cum_clipped_reward += self.rew_clipper(reward)
             rew += reward
             for internal_skip in range(self.internal_skip_frame - 1):
@@ -250,7 +248,6 @@ class BDQN_Learner():
                 rew += reward
         next_frame_new, reward, terminated, truncated, _ = self.env.step(action)
         done = terminated or truncated
-        self.renderimage(next_frame)
         self.cum_clipped_reward += self.rew_clipper(reward)
         rew += reward
 

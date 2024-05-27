@@ -3,7 +3,6 @@ from .normalizer import *
 import torch
 import gymnasium as gym
 from gymnasium.spaces import Discrete
-from typing import Union
 from argparse import ArgumentParser
 from .replay_memory import *
 from ..network import *
@@ -29,18 +28,23 @@ class Config:
     SIGMA_VARIANCE = 0.001
     NOISE_VARIANCE = 1
     USE_SOFTMAX_POLICY = False
+    SKIP_FRAMES = False
+    FRAMES_TO_SKIP = 4
+    MAX_EPISODAL_TIME_STEPS = 5 * 10**2 
 
-    def __init__(self, env_name=ENV_NAME) -> None:
+    def __init__(self, env_name=ENV_NAME, use_max_episodal_t_steps = True) -> None:
 
         self.arg_parser = ArgumentParser()
 
         # boolean values defining the training process
         self.double_q = Config.USE_DQN # whether to use a target Q-network and the policy Q-network
 
-        # defines the evaluation ATARI environment
+        # configurations wrt ATARI environment
         self.env_name = env_name
         self.__eval_env = None
         self.set_eval_env()
+        self.skip_frames = False
+        self.max_t_steps_per_episode = Config.MAX_EPISODAL_TIME_STEPS if use_max_episodal_t_steps else None
 
         # classes/methods
         self.network_fn = Config.CONV_NETWORK # Convolutional neural network for Q-learning
@@ -49,7 +53,7 @@ class Config:
         self.replay_fn = Config.REPLAY_BUFFER # Replay function
 
         # normalizers for the input batch of tensors tensor of the convolutional neural network
-        self.state_normalizer = AtariImageNormalizer(Config.CONV_BATCH_SIZE, Config.STATE_WIDTH, Config.STATE_HEIGHT) # normalizer for the state, i.e., the input tensors of Atari games
+        self.state_normalizer = AtariImageNormalizer() # normalizer for the state, i.e., the input tensors of Atari games
 
         # normalizers for the agent exploration
         self.reward_normalizer = SignNormalizer() # normalizer for the reward
@@ -75,7 +79,7 @@ class Config:
 
 
     @property
-    def eval_env(self) -> Union[gym.Env, None]:
+    def eval_env(self) -> gym.Env:
         return self.__eval_env
     
 
