@@ -60,7 +60,7 @@ class BDQNAgent:
         # initialization of the three-dimensional tensor of $\phi(x)\phi(x)^\top$
         self.phi_phi_t = torch.zeros(self.num_actions, self.phi_size, self.phi_size).to(self.config.device).detach()
         # initialization of the two-dimensional tensor of $\phi y$
-        self.phi_qtarget = torch.zeros(self.num_actions, self.phi_size).to(self.config.device).detach()
+        self.phi_Qtarget = torch.zeros(self.num_actions, self.phi_size).to(self.config.device).detach()
 
         # copy the state of policy network to initialize the target network
         self.target_network.load_state_dict(self.policy_network.state_dict())
@@ -78,53 +78,48 @@ class BDQNAgent:
 
 
     def posterior_update(self) -> None:
-        # reset self.phi_phi_t and self.phi_qtarget to zero
+        # reset self.phi_phi_t and self.phi_Qtarget to zero
         self.phi_phi_t *= 0
-        self.phi_qtarget *= 0
-
-        if self.total_t_steps > self.config.num_warmup_t_steps:
-            batch_size = Config.CONV_BATCH_SIZE
-            # min: int(20000/32), max: int(200000/32)
-            num_blr_repetitions = int( min(self.posterior_update_batch_size, self.total_t_steps) / batch_size)
+        self.phi_Qtarget *= 0
+        # min: int(20000/32), max: int(200000/32)
+        num_blr_repetitions = int( min(self.posterior_update_batch_size, self.total_t_steps) / self.config.batch_size)
+        
+        # repeat the posterior update exploration time steps
+        for _ in range(num_blr_repetitions):
+            batch_of_transitions: List[ReplayMemory.Transitions] = self.replay.sample(self.config.batch_size)
+            """
+            Transitions.states shall be of shape (4, 84, 84)
+            """
+            batch_of_states: torch.Tensor = torch.cat([el.states for el in batch_of_transitions], dim=0).to(self.config.device)
+            batch_of_action: Tuple[int] = tuple([el.action for el in batch_of_transitions])
+            batch_of_reward: Tuple[float] = tuple([el.reward for el in batch_of_transitions])
+            batch_of_next_states: torch.Tensor = torch.cat([el.next_states for el in batch_of_transitions], dim=0).to(self.config.device)
+            batch_of_done_flags: Tuple[bool] = tuple([el.done for el in batch_of_transitions])
+            with torch.no_grad():
+                """
+                compute the Q-values of the next states
+                shape of $batch_of_next_states_phi: (32, 512)
+                shape of $expected_q_target: (32, )
+                """
+                policy_state_phi, expected_q_target = self.extract_state_phi(batch_of_states, batch_of_reward, batch_of_next_states, batch_of_done_flags)
             
-            # repeat the posterior update exploration time steps
-            for _ in range(num_blr_repetitions):
-                batch_of_transitions: List[ReplayMemory.Transitions] = self.replay.sample(batch_size)
+                            # can improve by not using a loop
+            for i in range(self.config.batch_size):
+                action = batch_of_action[i]
+                self.phi_phi_t[action] += torch.matmul(policy_state_phi[i].unsqueeze(0).T, policy_state_phi[i].unsqueeze(0)).to(self.config.device).detach()
+                self.phi_Qtarget[action] += policy_state_phi[i] * expected_q_target[i].item()
+            
+            for i in range(self.num_actions):
                 """
-                Transitions.states shall be of shape (4, 84, 84)
+                size of $inv: (512, 512)
                 """
-                batch_of_states: torch.Tensor = torch.cat([el.states for el in batch_of_transitions], dim=0).to(self.config.device).detach()
-                batch_of_action: Tuple[int] = (el.actions for el in batch_of_transitions)
-                batch_of_reward: Tuple[float] = (el.rewards for el in batch_of_transitions)
-                batch_of_next_states: torch.Tensor = torch.cat([el.next_states for el in batch_of_transitions], dim=0).to(self.config.device).detach()
-                batch_of_done_flags: Tuple[bool] = (el.done for el in batch_of_transitions)
-
-                with torch.no_grad():
-                    """
-                    compute the Q-values of the next states
-                    shape of $batch_of_next_states_phi: (32, 512)
-                    shape of $expected_q_target: (32, )
-                    """
-                    policy_state_phi, expected_q_target = self.extract_state_phi(batch_of_states, batch_of_reward, batch_of_next_states, batch_of_done_flags)
-                
-                                # can improve by not using a loop
-                for i in range(batch_size):
-                    action = batch_of_action[i]
-                    self.phi_phi_t[action] += torch.matmul(policy_state_phi[i].unsqueeze(0).T, policy_state_phi[i].unsqueeze(0)).to(self.config.device).detach()
-                    self.phi_qtarget[action] += policy_state_phi[i] * expected_q_target[i].item()
-
-                
-                for i in range(self.num_actions):
-                    """
-                    size of $inv: (512, 512)
-                    """
-                    inv = torch.inverse( self.phi_phi_t[i]/self.noise_variance + 1/self.prior_variance * torch.eye(self.phi_size).to(self.config.device).detach() ).to(self.config.device).detach()
-                    self.policy_mean[i] = torch.matmul(inv, self.phi_qtarget[i]).to(self.config.device).detach() / self.noise_variance
-                    self.policy_cov[i] = self.prior_variance * inv
-                    try:
-                        self.policy_cov_decom[i] = torch.cholesky((self.policy_cov[i]+self.policy_cov[i].T)/2).to(self.config.device).detach()
-                    except RuntimeError:
-                        pass
+                inv = torch.inverse( self.phi_phi_t[i]/self.noise_variance + 1/self.prior_variance * torch.eye(self.phi_size).to(self.config.device).detach() ).to(self.config.device).detach()
+                self.policy_mean[i] = torch.matmul(inv, self.phi_Qtarget[i]).to(self.config.device).detach() / self.noise_variance
+                self.policy_cov[i] = self.prior_variance * inv
+                try:
+                    self.policy_cov_decom[i] = torch.cholesky((self.policy_cov[i]+self.policy_cov[i].T)/2).to(self.config.device).detach()
+                except RuntimeError:
+                    pass
 
 
     def thompson_sample(self) -> None:
@@ -136,8 +131,6 @@ class BDQNAgent:
             self.policy_cov_decom[i].shape = (self.phi_size, self.phi_size)
             """
             self.thompson_sampled_mean[i] = self.policy_mean[i] + torch.matmul(self.policy_cov_decom[i], sample).to(self.config.device).detach().squeeze(-1)
-
-        self.policy_mean = self.thompson_sampled_mean.clone().to(self.config.device).detach()
     
 
     """
@@ -169,7 +162,7 @@ class BDQNAgent:
             shape of $batch_of_target_q_next: (32, self.num_actions)
             shape of $batch_of_expected_q_target_next: (32,)
             """
-            batch_of_q_next = torch.matmul(batch_of_next_states_phi_policy, self.policy_mean.T)
+            batch_of_q_next = torch.matmul(batch_of_next_states_phi_policy, self.thompson_sampled_mean.T)
             # use the softmax function to infer the probablity of each action to calculate the expected Q_next
             batch_of_prob_actions = nn.functional.softmax(batch_of_q_next, dim=1).to(self.config.device).detach()
             
@@ -253,7 +246,7 @@ class BDQNAgent:
     @param state: torch.Tensor
         desired states.shape: (4, 84, 84)
     """
-    def act_in_env(self, action, state) -> Tuple[torch.Tensor, int, int, bool]:
+    def act_in_env(self, action: int, state: torch.Tensor) -> Tuple[torch.Tensor, int, int, bool]:
         return self.act_with_frame_skipping(action, state) if self.config.skip_frames else self.act_without_frame_skipping(action, state)
     
 
@@ -279,43 +272,81 @@ class BDQNAgent:
 
 
     """
+    The method to update the weights and biases of the policy DQN using the optimizer
+    """
+    def optimizer_policy_network(self):
+        batch_of_transitions: List[ReplayMemory.Transitions] = self.replay.sample(self.config.batch_size)
+        """
+        Transitions.states and Transitions.next_states shall be of shape (4, 84, 84)
+        """
+        batch_of_states: torch.Tensor = torch.cat([el.states for el in batch_of_transitions], dim=0).to(self.config.device)
+        batch_of_next_states: torch.Tensor = torch.cat([el.next_states for el in batch_of_transitions], dim=0).to(self.config.device)
+        batch_of_done_flags: Tuple[bool] = tuple([el.done for el in batch_of_transitions])
+        batch_of_rewards: Tuple[int] = tuple([el.reward for el in batch_of_transitions])
+        batch_of_actions: Tuple[int] = tuple([el.action for el in batch_of_transitions])
+   
+        # argmax_action_by_Q_policy.shape = (32, 1)
+        argmax_action_by_Q_policy = torch.argmax(torch.matmul(self.policy_network(batch_of_next_states), self.thompson_sampled_mean.T), dim = 1).to(device=self.config.device, dtype=torch.int32).detach().unsqueeze(-1)
+        # Q_target_next.shape = (32, self.num_actions)
+        Q_target_next = torch.matmul(self.target_network(batch_of_next_states), self.target_mean.T).to(self.config.device)
+        # Q_target_next_max.shape = (32, 1)
+        # Q_target_next_expected.shape = (32, 1)
+        Q_target_next_max = Q_target_next.gather(dim=1, index=argmax_action_by_Q_policy) * torch.tensor(tuple([1-flag for flag in batch_of_done_flags])).unsqueeze(-1)
+        Q_target_next_expected = (torch.tensor(batch_of_rewards).unsqueeze(-1) + self.config.gamma * Q_target_next_max).to(dtype=torch.float64)
+        
+        # Q_policy_current.shape = (32, self.num_actions)
+        Q_policy_current = torch.matmul(self.policy_network(batch_of_states), self.policy_mean.T).to(self.config.device)
+        # Q_policy_observed_current.shape = (32, 1)
+        Q_policy_observed_current = Q_policy_current.gather(dim=1, index=torch.tensor(batch_of_actions).unsqueeze(-1)).to(dtype=torch.float64)
+        
+        # $loss is a scalar tensor
+        loss: torch.Tensor = self.config.loss_function(Q_policy_observed_current, Q_target_next_expected)
+        loss = loss.to(device=self.config.device)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+
+    """
     Method for training one episode
     """
     def train_one_episode(self) -> None:
+        
         self.episodal_t_steps = 0
         self.episodal_reward = 0
         self.episodal_clipped_reward = 0
-        episode_done = False
         first_frame, _ = self.config.eval_env.reset()
         next_states = self.init_episodal_states(first_frame)
 
-        while not episode_done:
-            
-            states = next_states
 
+        while True: 
+            if self.config.max_t_steps_per_episode is not None:
+                if self.episodal_t_steps >= self.config.max_t_steps_per_episode: break
+
+            states = next_states
             action = self.select_action(states)
 
-            if self.config.max_t_steps_per_episode is not None:
-                if self.episodal_t_steps >= self.config.max_t_steps_per_episode:
-                    episode_done = True
-
             next_states, reward, clipped_reward, done = self.act_in_env(action, states)
-            episode_done = done
-
             self.replay.push(
                 states=states,
                 action=action,
-                reward=reward,
+                reward = clipped_reward if self.config.clip_rewards else reward,
                 next_states=next_states,
                 done=done
             )
+            self.total_t_steps += 1
+            self.episodal_t_steps += 1
+            if done: break
 
+            # update the network
             if self.total_t_steps > self.config.num_warmup_t_steps:
-                self.total_non_warmup_t_steps += 1
-
-            # perform Thompson sampling when needed
-            if self.total_t_steps % self.config.sampling_interval:
-                self.thompson_sample()
-
-
-            # update the policy network
+                self.total_non_warmup_t_steps += 1 
+                # perform Thompson sampling when needed
+                if self.total_t_steps % self.config.sampling_interval == 0:
+                    self.thompson_sample()
+                # perform gradient descent to update
+                if self.total_t_steps % self.config.gd_update_interval == 0:
+                    self.optimizer_policy_network()
+                    self.total_gd_t_times +=1
+            
+            # save the model, update the target network and perform posterior update if necessary

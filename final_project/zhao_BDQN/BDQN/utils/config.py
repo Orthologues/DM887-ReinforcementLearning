@@ -11,7 +11,7 @@ class Config:
     
     DEVICE = "cuda:0"
     TARGET_NETWORK_UPDATE_INTERVAL = 5*10**3
-    BLR_POSTERIOR_UPDATE_INTERVAL = 5*10**4
+    POSTERIOR_UPDATE_INTERVAL = 5*10**4
     GD_UPDATE_INTERVAL = 10 # gradient descent update frequency for the policy Q-network
     WARMUP_STEPS = 5 * 10**3
     THOMPSON_SAMPLING_INTERVAL = 100
@@ -34,6 +34,7 @@ class Config:
     MAX_EPISODAL_TIME_STEPS = 5 * 10**2 
     MAX_BLR_BATCH_SIZE = 2 * 10**4
     REPLAY_SIZE = 10**4
+    CLIP_REWARDS = False
 
     def __init__(self, env_name=ENV_NAME, use_max_episodal_t_steps = True) -> None:
 
@@ -71,15 +72,16 @@ class Config:
         self.noise_variance = Config.NOISE_VARIANCE
         self.gamma = Config.DISCOUNT
         self.max_posterior_update_batch_size = Config.MAX_BLR_BATCH_SIZE
+        self.clip_rewards = Config.CLIP_REWARDS
+        self.blr_learn_interval = Config.POSTERIOR_UPDATE_INTERVAL # the frequency of doing posterior update to the bayesian linear regression layer (BLR)
+        self.batch_size = Config.CONV_BATCH_SIZE # batch size for the DQN
+        self.loss_function = torch.nn.MSELoss()
 
         """
         Other parameters
         """
         self.eval_interval = 2e5
         self.eval_episodes = 10 # number of episodes to evaluate per $self.eval_interval time steps
-
-        self.blr_learn_interval = Config.BLR_POSTERIOR_UPDATE_INTERVAL # the frequency of doing posterior update to the bayesian linear regression layer (BLR)
-
 
     @property
     def eval_env(self) -> gym.Env:

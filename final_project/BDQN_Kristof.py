@@ -354,6 +354,8 @@ class BDQN_Learner():
                     self.optimizer.step()
             t += 1
             self.frame_counter += 1
+
+            
             # Save the model, update Target model and update posterior
             if self.frame_counter > self.replay_start_size:
                 if self.frame_counter % self.Target_update == 0:
