@@ -67,16 +67,13 @@ class BDQNAgent:
 
         # values to track time steps and the number of episodes
         self.total_t_steps = 0
-        self.total_non_warmup_t_steps = 0
-        self.total_gd_t_times = 0 # total number of gradient descent time steps
+        self.total_gd_t_steps = 0 # total number of gradient descent time steps
         self.episodal_t_steps = 0
         self.target_network_update_count_per_target_weight_update = 0
 
         # episodal attributes during episodal interactions between the agent and the environment 
         self.episodal_clipped_reward = 0
-        self.total_clipped_reward = 0
         self.episodal_reward = 0
-        self.total_reward = 0
         self.num_skipped_frames = 4 if config.skip_frames else None
 
 
@@ -346,19 +343,18 @@ class BDQNAgent:
                         clipped reward: {self.episodal_clipped_reward}, 
                         episodal time steps: {self.episodal_t_steps},
                         total time steps: {self.total_t_steps},
-                        total gradient descent time steps: {self.total_gd_t_times}")
+                        total gradient descent time steps: {self.total_gd_t_steps}")
                 break
 
             # update the network
             if self.total_t_steps > self.config.num_warmup_t_steps:
-                self.total_non_warmup_t_steps += 1 
                 # perform Thompson sampling when needed
                 if self.total_t_steps % self.config.sampling_interval == 0:
                     self.thompson_sample()
                 # perform gradient descent to update
                 if self.total_t_steps % self.config.gd_update_interval == 0:
                     self.optimizer_policy_network()
-                    self.total_gd_t_times +=1
+                    self.total_gd_t_steps +=1
             
                 # update the target network when necessary
                 if self.total_t_steps % self.config.target_network_update_interval == 0:
@@ -371,4 +367,11 @@ class BDQNAgent:
                          self.target_mean = self.policy_mean()
                          self.target_cov = self.policy_cov()
                          self.target_network_update_count_per_target_weight_update = 0
-            
+
+    """
+    run the evaluation mode for $config.num_eval_episodes episodes
+    """     
+    def run_eval_mode(self):
+        
+        for _ in range(self.config.num_eval_episodes):
+            pass #TODO

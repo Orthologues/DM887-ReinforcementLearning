@@ -36,7 +36,7 @@ class Config:
     FRAMES_TO_SKIP = 4
     MAX_EPISODAL_TIME_STEPS = 5 * 10**2 
     MAX_BLR_BATCH_SIZE = 5 * 10**4
-    MAX_TRAINING_EPISODE = 1000
+    MAX_TRAINING_EPISODE = 5000
     REPLAY_SIZE = 10**4
     CLIP_REWARDS = False
 
@@ -85,8 +85,8 @@ class Config:
         """
         Other parameters
         """
-        self.eval_interval = 2e5
-        self.eval_episodes = 10 # number of episodes to evaluate per $self.eval_interval time steps
+        self.num_training_episodes_per_eval = 50
+        self.num_eval_episodes = 5 # number of episodes to evaluate per $self.eval_interval time steps
 
     @property
     def eval_env(self) -> gym.Env:
