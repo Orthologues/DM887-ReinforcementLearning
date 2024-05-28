@@ -1,22 +1,16 @@
 from BDQN import *
 
 def learn_breakoutV5():
-    total_rewards = 0
-    list_total_t_steps = []
-    list_total_non_warmup_steps = []
-    list_total_gd_t_steps = []
-    list_gd_t_step_at_eval = [] 
-    list_mean_eval_reward = []
 
     config = Config(env_name='ALE/Breakout-v5')
     agent = BDQNAgent(config)
     
-    for eps in range(1, config.num_training_episodes+1):
+    for eps in range(config.num_training_episodes):
         agent.train_one_episode()
-        total_rewards += agent.episodal_reward
-        list_total_t_steps.append(agent.total_t_steps)
-        list_total_non_warmup_steps.append(agent.total_t_steps - config.num_warmup_t_steps)
-        list_total_gd_t_steps.append(agent.total_t_steps)
+        agent.save_model(eps+1, "/content/Breakout-v5")
+        if (eps+1) % config.num_training_episodes_per_eval == 0:
+            agent.run_eval_mode(eps+1, "Breakout-v5_eval")
 
-        if eps % config.num_training_episodes_per_eval == 0:
-            agent.run_eval_mode() #TODO
+
+if __name__ == "__main__":
+    learn_breakoutV5()

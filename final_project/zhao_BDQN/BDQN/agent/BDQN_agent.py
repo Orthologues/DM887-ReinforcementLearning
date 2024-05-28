@@ -2,6 +2,10 @@ from ..network import *
 from ..utils import *
 from torch import nn, optim
 from typing import List
+from pandas import DataFrame
+from statistics import mean, stdev
+import os
+
 
 """
 Reference of the BDQN algorithm: 
@@ -75,6 +79,10 @@ class BDQNAgent:
         self.episodal_clipped_reward = 0
         self.episodal_reward = 0
         self.num_skipped_frames = 4 if config.skip_frames else None
+
+        # attributes related to the evaluation or recording
+        self.training_pandas_df: DataFrame = DataFrame(columns=["training_episode_idx", "num_total_time_steps", "num_gd_time_steps", "episodal_reward", "episodal_t_steps"])
+        self.eval_pandas_df: DataFrame = DataFrame(columns=["training_episode_idx", "num_gd_time_steps", "eval_reward_mean", "eval_reward_std", "num_eval_episodes"])
 
 
     def posterior_update(self) -> None:
@@ -274,7 +282,7 @@ class BDQNAgent:
     """
     The method to update the weights and biases of the policy DQN using the optimizer
     """
-    def optimizer_policy_network(self):
+    def optimize_policy_network(self):
         batch_of_transitions: List[ReplayMemory.Transitions] = self.replay.sample(self.config.batch_size)
         """
         Transitions.states and Transitions.next_states shall be of shape (4, 84, 84)
@@ -353,7 +361,7 @@ class BDQNAgent:
                     self.thompson_sample()
                 # perform gradient descent to update
                 if self.total_t_steps % self.config.gd_update_interval == 0:
-                    self.optimizer_policy_network()
+                    self.optimize_policy_network()
                     self.total_gd_t_steps +=1
             
                 # update the target network when necessary
@@ -371,7 +379,78 @@ class BDQNAgent:
     """
     run the evaluation mode for $config.num_eval_episodes episodes
     """     
-    def run_eval_mode(self):
+    def run_eval_mode(self, training_episode_idx: int, csv_prefix: str):
         
+        episodal_rewards = []
+
         for _ in range(self.config.num_eval_episodes):
-            pass #TODO
+            self.episodal_t_steps = 0
+            self.episodal_reward = 0
+            self.episodal_clipped_reward = 0
+            first_frame, _ = self.config.eval_env.reset()
+            next_states = self.init_episodal_states(first_frame)
+            while True: 
+                if self.config.max_t_steps_per_episode is not None:
+                    if self.episodal_t_steps >= self.config.max_t_steps_per_episode: 
+                        episodal_rewards.append(self.episodal_reward)
+                        break
+                
+                states = next_states
+                action = self.select_action(states)
+
+                next_states, reward, clipped_reward, done = self.act_in_env(action, states)
+                self.replay.push(
+                    states=states,
+                    action=action,
+                    reward = clipped_reward if self.config.clip_rewards else reward,
+                    next_states=next_states,
+                    done=done
+                )
+                self.episodal_t_steps += 1
+                if done: 
+                    episodal_rewards.append(self.episodal_reward)
+                    break
+        
+        episodal_data_row = {
+            "training_episode_idx": training_episode_idx, 
+            "num_gd_time_steps": self.total_gd_t_steps,
+            "eval_reward_mean": mean(episodal_rewards), 
+            "eval_reward_std": stdev(episodal_rewards),
+            "num_eval_episodes": self.config.num_eval_episodes
+        }
+
+        # Append the new row to the DataFrame
+        self.eval_pandas_df.loc[len(self.eval_pandas_df)] = episodal_data_row
+        with open(f"{csv_prefix}.csv", 'a') as f:
+            self.eval_pandas_df.to_csv(f, mode='a', header=f.tell()==0)
+
+        
+    def save_model(self, training_episode_idx: int, prefix: str):
+
+        directory = f"{prefix}/model"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        
+        episodal_data_row = {
+            "training_episode_idx": training_episode_idx, 
+            "num_total_time_steps": self.total_t_steps, 
+            "num_gd_time_steps": self.total_gd_t_steps,
+            "episodal_reward": self.episodal_reward, 
+            "episodal_t_steps": self.episodal_t_steps,
+        }
+
+        # Append the new row to the DataFrame
+        self.training_pandas_df.loc[len(self.training_pandas_df)] = episodal_data_row
+        with open(f"{directory}/training_record.csv", 'a') as f:
+            self.training_pandas_df.to_csv(f, mode='a', header=f.tell()==0)
+        
+        torch.save(self.policy_network.state_dict(), f"{directory}/policy_dqn_.pth")
+        torch.save(self.target_network.state_dict(), f"{directory}/target_dqn_.pth")
+        torch.save(self.policy_mean, f"{directory}/policy_E_W_mean.pth")
+        torch.save(self.policy_cov, f"{directory}/policy_E_W_cov.pth")
+        torch.save(self.policy_cov_decom, f"{directory}/policy_E_W_std.pth")
+        torch.save(self.thompson_sampled_mean, f"{directory}/policy_E_W_sampled.pth")
+        torch.save(self.target_mean, f"{directory}/target_E_W_mean.pth")
+        torch.save(self.target_cov, f"{directory}/target_E_W_cov.pth")
+
+        

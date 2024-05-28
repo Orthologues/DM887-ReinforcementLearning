@@ -1,0 +1,6 @@
+gymnasium[atari, accept-rom-license]
+torch
+torchvision
+tdqm
+matplotlib
+pandas
