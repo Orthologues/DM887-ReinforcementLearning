@@ -1,7 +1,7 @@
 import numpy as np
 from torch import DeviceObjType, Tensor, nn, tensor, cat as concat_tensors
 from typing import Tuple, List, Union, Any, Dict
-from ..utils import Config
+from .config import Config
 
 """
 The class to construct the 
