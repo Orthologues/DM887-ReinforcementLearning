@@ -86,9 +86,9 @@ class BDQNAgent:
 
 
     def posterior_update(self) -> None:
-        # reset self.phi_phi_t and self.phi_Qtarget to zero
+        # reset self.phi_phi_t and self.phi__Q_target to zero
         self.phi_phi_t *= 0
-        self.phi_Qtarget *= 0
+        self.phi__Q_target *= 0
         # min: int(20000/32), max: int(200000/32)
         num_blr_repetitions = int( min(self.posterior_update_batch_size, self.total_t_steps) / self.config.batch_size)
         
