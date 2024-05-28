@@ -98,8 +98,8 @@ class BDQNAgent:
             """
             Transitions.states shall be of shape (4, 84, 84)
             """
-            batch_of_states: torch.Tensor = torch.cat([el.states.to("gpu").unsqueeze(0) for el in batch_of_transitions], dim=0).to(self.config.device)
-            batch_of_next_states: torch.Tensor = torch.cat([el.next_states.to("gpu").unsqueeze(0) for el in batch_of_transitions], dim=0).to(self.config.device)
+            batch_of_states: torch.Tensor = torch.cat([el.states.to(self.config.device).unsqueeze(0) for el in batch_of_transitions], dim=0)
+            batch_of_next_states: torch.Tensor = torch.cat([el.next_states.to(self.config.device).unsqueeze(0) for el in batch_of_transitions], dim=0)
             batch_of_action: Tuple[int] = tuple([el.action for el in batch_of_transitions])
             batch_of_reward: Tuple[float] = tuple([el.reward for el in batch_of_transitions])
             batch_of_done_flags: Tuple[bool] = tuple([el.done for el in batch_of_transitions])
@@ -287,8 +287,8 @@ class BDQNAgent:
         """
         Transitions.states and Transitions.next_states shall be of shape (4, 84, 84)
         """
-        batch_of_states: torch.Tensor = torch.cat([el.states.to("gpu").unsqueeze(0) for el in batch_of_transitions], dim=0).to(self.config.device)
-        batch_of_next_states: torch.Tensor = torch.cat([el.next_states.to("gpu").unsqueeze(0) for el in batch_of_transitions], dim=0).to(self.config.device)
+        batch_of_states: torch.Tensor = torch.cat([el.states.to(self.config.device).unsqueeze(0) for el in batch_of_transitions], dim=0)
+        batch_of_next_states: torch.Tensor = torch.cat([el.next_states.to(self.config.device).unsqueeze(0) for el in batch_of_transitions], dim=0)
         batch_of_done_flags: Tuple[bool] = tuple([el.done for el in batch_of_transitions])
         batch_of_rewards: Tuple[int] = tuple([el.reward for el in batch_of_transitions])
         batch_of_actions: Tuple[int] = tuple([el.action for el in batch_of_transitions])
