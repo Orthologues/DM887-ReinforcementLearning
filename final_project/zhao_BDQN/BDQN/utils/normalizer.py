@@ -99,8 +99,6 @@ class RescalingNormalizer(BaseNormalizer):
         self.coef = coef
 
     def __call__(self, x):
-        if isinstance(x, Tensor):
-            x = np.asarray(x.cpu())
         return self.coef * x
     
 
