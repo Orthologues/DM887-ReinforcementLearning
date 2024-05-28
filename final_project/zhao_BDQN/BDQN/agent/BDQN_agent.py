@@ -265,7 +265,7 @@ class BDQNAgent:
     @rval desired Tensor.shape = (4, 84, 84)
     """
     def init_episodal_states(self, x) -> torch.Tensor:
-        x = tensor(x).to(self.config.device).detach().permute(2, 0, 1)
+        x = tensor(x).to(device=self.config.device, dtype=torch.float32).detach().permute(2, 0, 1)
         x *= 1.0/255
         x = 0.2989 * x[0, :, :] + 0.5870 * x[1, :, :] + 0.1140 * x[2, :, :]
         # Add two dimensions to the start, the input frame has a shape at (1, 1, 210, 160) afterwards 
