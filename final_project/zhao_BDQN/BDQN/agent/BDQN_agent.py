@@ -160,7 +160,7 @@ class BDQNAgent:
         shape of $batch_of_next_states_phi: (32, 512)
         """
         with torch.no_grad():
-            batch_of_states_phi = self.policy_network(batch_of_states.unsqueeze(0))
+            batch_of_states_phi = self.policy_network(batch_of_states)
             batch_of_next_states_phi_policy = self.policy_network(batch_of_next_states)
             batch_of_next_states_phi_target = self.target_network(batch_of_next_states)
             # calculate the expected Q-value of the next states using the target Q mean values
