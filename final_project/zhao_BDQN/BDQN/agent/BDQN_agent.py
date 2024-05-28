@@ -337,10 +337,10 @@ class BDQNAgent:
 
             next_states, reward, clipped_reward, done = self.act_in_env(action, states)
             self.replay.push(
-                states=states,
+                states=states.to("cpu"),
                 action=action,
                 reward = clipped_reward if self.config.clip_rewards else reward,
-                next_states=next_states,
+                next_states=next_states.to("cpu"),
                 done=done
             )
             self.total_t_steps += 1
