@@ -330,7 +330,6 @@ class BDQNAgent:
         while True: 
             if self.config.max_t_steps_per_episode is not None:
                 if self.episodal_t_steps >= self.config.max_t_steps_per_episode: 
-                    print(f"max t steps per episode {self.config.max_t_steps_per_episode} reached, episodal reward: {self.episodal_reward}, clipped reward: {self.episodal_clipped_reward}, episodal time steps: {self.episodal_t_steps}, total time steps: {self.total_t_steps}, total gradient descent time steps: {self.total_gd_t_steps}")
                     break
 
             states = next_states
@@ -347,7 +346,6 @@ class BDQNAgent:
             self.total_t_steps += 1
             self.episodal_t_steps += 1
             if done: 
-                print(f"episodal reward: {self.episodal_reward}, clipped reward: {self.episodal_clipped_reward}, episodal time steps: {self.episodal_t_steps}, total time steps: {self.total_t_steps}, total gradient descent time steps: {self.total_gd_t_steps}")
                 break
 
             # update the network
@@ -420,13 +418,8 @@ class BDQNAgent:
         with open(f"{csv_prefix}.csv", 'w') as f:
             self.eval_pandas_df.to_csv(f, mode='a', header=f.tell()==0, index=False)
 
-        
-    def save_model(self, training_episode_idx: int, prefix: str):
 
-        directory = f"{prefix}/model"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        
+    def save_training_record(self, training_episode_idx, csv_prefix: str):
         episodal_data_row = {
             "training_episode_idx": training_episode_idx, 
             "num_total_time_steps": self.total_t_steps, 
@@ -437,8 +430,15 @@ class BDQNAgent:
 
         # Append the new row to the DataFrame
         self.training_pandas_df.loc[len(self.training_pandas_df)] = episodal_data_row
-        with open(f"{directory}/training_record.csv", 'w') as f:
+        with open(f"{csv_prefix}.csv", 'w') as f:
             self.training_pandas_df.to_csv(f, mode='a', header=f.tell()==0, index=False)
+        
+
+    def save_model(self, prefix: str):
+
+        directory = f"{prefix}/model"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
         
         torch.save(self.policy_network.state_dict(), f"{directory}/policy_dqn_.pth")
         torch.save(self.target_network.state_dict(), f"{directory}/target_dqn_.pth")

@@ -12,28 +12,28 @@ class Config:
     DEVICE = "cuda:0"
     """
     The frequency of a posterior update is 
-    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/2000
+    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/1000
     """
     TARGET_NETWORK_UPDATE_INTERVAL = 5 * 10**2
-    TARGET_WEIGHT_UPDATE_INTERVAL = 4
-    GD_UPDATE_INTERVAL = 10 # gradient descent update frequency for the policy Q-network
+    TARGET_WEIGHT_UPDATE_INTERVAL = 2
+    GD_UPDATE_INTERVAL = 20 # gradient descent update frequency for the policy Q-network
     WARMUP_STEPS = 5 * 10**3
     THOMPSON_SAMPLING_INTERVAL = 100
-    DISCOUNT = 0.95
+    DISCOUNT = 0.99
     CONV_BATCH_SIZE = 32
     STATE_WIDTH = 84
     STATE_HEIGHT = 84
     DEFAULT_OPTIMIZER_FN = lambda params: torch.optim.Adam(
-    params, lr=1e-3, betas=(0.9, 0.999), eps=0.01) 
+    params, lr=2.5e-3, betas=(0.9, 0.999), eps=0.01) 
     USE_DQN = True
     REPLAY_HISTORY_LENGTH = 4
     REPLAY_BUFFER = lambda capacity: ReplayMemory(capacity)
     CONV_NETWORK = lambda input_dim: BdqnConvNet(input_dim)
     SIGMA_VARIANCE = 0.001
     NOISE_VARIANCE = 1
-    USE_SOFTMAX_POLICY = False
+    USE_SOFTMAX_POLICY = True
     SKIP_FRAMES = True
-    FRAMES_TO_SKIP = 4
+    FRAMES_TO_SKIP = 2
     MAX_EPISODAL_TIME_STEPS = 5 * 10**2 
     MAX_BLR_BATCH_SIZE = 10**4
     MAX_TRAINING_EPISODE = 5000
