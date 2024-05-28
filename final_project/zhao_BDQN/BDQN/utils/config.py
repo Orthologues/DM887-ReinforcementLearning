@@ -49,8 +49,9 @@ class Config:
 
         # configurations wrt ATARI environment
         self.env_name = env_name
-        self.__eval_env = None
-        self.set_eval_env()
+        self.__eval_env = gym.make(self.env_name) 
+        self.state_dim = self.__eval_env.observation_space.shape
+        self.action_count = self.__eval_env.action_space.n if isinstance(self.__eval_env.action_space, Discrete) else None
         self.skip_frames = False
         self.max_t_steps_per_episode = Config.MAX_EPISODAL_TIME_STEPS if use_max_episodal_t_steps else None
         self.device = torch.device(Config.DEVICE)
@@ -88,18 +89,12 @@ class Config:
         self.num_training_episodes_per_eval = 50
         self.num_eval_episodes = 5 # number of episodes to evaluate per $self.eval_interval time steps
 
+
     @property
     def eval_env(self) -> gym.Env:
         return self.__eval_env
     
-
-    @eval_env.setter
-    def set_eval_env(self):
-        self.__eval_env = gym.make(self.env_name) 
-        self.state_dim = self.__eval_env.observation_space.shape
-        self.action_count = self.__eval_env.action_space.n if isinstance(self.__eval_env.action_space, Discrete) else None
-
-
+        
     def add_argument(self, *args, **kwargs):
         self.arg_parser.add_argument(*args, **kwargs)
 
