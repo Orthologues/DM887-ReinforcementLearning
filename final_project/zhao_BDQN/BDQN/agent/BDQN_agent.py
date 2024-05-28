@@ -417,7 +417,7 @@ class BDQNAgent:
 
         # Append the new row to the DataFrame
         self.eval_pandas_df.loc[len(self.eval_pandas_df)] = episodal_data_row
-        with open(f"{csv_prefix}.csv", 'a') as f:
+        with open(f"{csv_prefix}.csv", 'w') as f:
             self.eval_pandas_df.to_csv(f, mode='a', header=f.tell()==0, index=False)
 
         
@@ -437,7 +437,7 @@ class BDQNAgent:
 
         # Append the new row to the DataFrame
         self.training_pandas_df.loc[len(self.training_pandas_df)] = episodal_data_row
-        with open(f"{directory}/training_record.csv", 'a') as f:
+        with open(f"{directory}/training_record.csv", 'w') as f:
             self.training_pandas_df.to_csv(f, mode='a', header=f.tell()==0, index=False)
         
         torch.save(self.policy_network.state_dict(), f"{directory}/policy_dqn_.pth")
