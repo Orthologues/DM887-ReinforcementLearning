@@ -305,7 +305,7 @@ class BDQNAgent:
         # Q_policy_current.shape = (32, self.num_actions)
         Q_policy_current = torch.matmul(self.policy_network(batch_of_states), self.policy_mean.T).to(self.config.device)
         # Q_policy_observed_current.shape = (32, 1)
-        Q_policy_observed_current = Q_policy_current.gather(dim=1, index=torch.tensor(batch_of_actions).unsqueeze(-1).to(dtype=torch.int64)).to(dtype=torch.float64)
+        Q_policy_observed_current = Q_policy_current.gather(dim=1, index=torch.tensor(batch_of_actions, device=self.config.device).unsqueeze(-1).to(dtype=torch.int64)).to(dtype=torch.float64)
         
         # $loss is a scalar tensor
         loss: torch.Tensor = self.config.loss_function(Q_policy_observed_current, Q_target_next_expected)
