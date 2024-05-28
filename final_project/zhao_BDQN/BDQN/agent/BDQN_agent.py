@@ -59,7 +59,7 @@ class BDQNAgent:
         # initialization of actual values at self.policy_cov_decom using Cholesky decomposition
         for i in range(self.num_actions):
             self.policy_cov[i] = torch.eye(self.phi_size).to(self.config.device).detach()
-            self.policy_cov_decom[i] = torch.cholesky( (self.policy_cov[i] + self.policy_cov[i].T)/2.0 ).to(self.config.device).detach()
+            self.policy_cov_decom[i] = torch.linalg.cholesky( (self.policy_cov[i] + self.policy_cov[i].T)/2.0 ).to(self.config.device).detach()
         
         # initialization of the three-dimensional tensor of $\phi(x)\phi(x)^\top$
         self.phi_phi_t = torch.zeros(self.num_actions, self.phi_size, self.phi_size).to(self.config.device).detach()
@@ -125,7 +125,7 @@ class BDQNAgent:
                 self.policy_mean[i] = torch.matmul(inv, self.phi_Qtarget[i]).to(self.config.device).detach() / self.noise_variance
                 self.policy_cov[i] = self.prior_variance * inv
                 try:
-                    self.policy_cov_decom[i] = torch.cholesky((self.policy_cov[i]+self.policy_cov[i].T)/2).to(self.config.device).detach()
+                    self.policy_cov_decom[i] = torch.linalg.cholesky((self.policy_cov[i]+self.policy_cov[i].T)/2).to(self.config.device).detach()
                 except RuntimeError:
                     pass
 
@@ -265,7 +265,7 @@ class BDQNAgent:
     @rval desired Tensor.shape = (4, 84, 84)
     """
     def init_episodal_states(self, x) -> torch.Tensor:
-        x = tensor(x).to(self.config.device).detach().permute(3, 1, 2)
+        x = tensor(x).to(self.config.device).detach().permute(2, 0, 1)
         x *= 1.0/255
         x = 0.2989 * x[0, :, :] + 0.5870 * x[1, :, :] + 0.1140 * x[2, :, :]
         # Add two dimensions to the start, the input frame has a shape at (1, 1, 210, 160) afterwards 

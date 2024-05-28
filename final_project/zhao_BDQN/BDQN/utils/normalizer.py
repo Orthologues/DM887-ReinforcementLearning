@@ -133,7 +133,7 @@ class AtariImageNormalizer(RescalingNormalizer):
             raise NotImplementedError("The Atari state frame must have a shape of (210, 160, 3)!")
 
         # $new_frame has a shape as (210, 160, 3), therefore, reshaping is necessary
-        x = tensor(new_frame).permute(3, 1, 2).detach().to(self.device)
+        x = tensor(new_frame).permute(2, 0, 1).detach().to(self.device)
         x = super().__call__(x)
         if self.rbg2greyscale:
             # Convert RGB to grayscale
