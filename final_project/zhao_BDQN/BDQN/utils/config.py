@@ -26,7 +26,7 @@ class Config:
     DEFAULT_OPTIMIZER_FN = lambda params: torch.optim.Adam(
     params, lr=1e-2, betas=(0.9, 0.999), eps=0.01) 
     USE_DQN = True
-    REPLAY_HISTORY_LENGTH = 8
+    REPLAY_HISTORY_LENGTH = 4
     REPLAY_BUFFER = lambda capacity: ReplayMemory(capacity)
     CONV_NETWORK = lambda input_dim: BdqnConvNet(input_dim)
     SIGMA_VARIANCE = 0.001
