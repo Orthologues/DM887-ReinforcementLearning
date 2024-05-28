@@ -300,7 +300,7 @@ class BDQNAgent:
         # Q_target_next_max.shape = (32, 1)
         # Q_target_next_expected.shape = (32, 1)
         Q_target_next_max = Q_target_next.gather(dim=1, index=argmax_action_by_Q_policy) * torch.tensor(tuple([1-flag for flag in batch_of_done_flags]), device=self.config.device).unsqueeze(-1)
-        Q_target_next_expected = (torch.tensor(batch_of_rewards).unsqueeze(-1) + self.config.gamma * Q_target_next_max).to(dtype=torch.float64)
+        Q_target_next_expected = (torch.tensor(batch_of_rewards, device=self.config.device).unsqueeze(-1) + self.config.gamma * Q_target_next_max).to(dtype=torch.float64)
         
         # Q_policy_current.shape = (32, self.num_actions)
         Q_policy_current = torch.matmul(self.policy_network(batch_of_states), self.policy_mean.T).to(self.config.device)
