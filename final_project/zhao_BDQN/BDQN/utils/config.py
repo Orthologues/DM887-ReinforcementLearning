@@ -12,10 +12,10 @@ class Config:
     DEVICE = "cuda:0"
     """
     The frequency of a posterior update is 
-    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/2000
+    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/5000
     """
     TARGET_NETWORK_UPDATE_INTERVAL = 1 * 10**3
-    TARGET_WEIGHT_UPDATE_INTERVAL = 2
+    TARGET_WEIGHT_UPDATE_INTERVAL = 5
     GD_UPDATE_INTERVAL = 10 # gradient descent update frequency for the policy Q-network
     WARMUP_STEPS = 2 * 10**4
     THOMPSON_SAMPLING_INTERVAL = 2 * 10**3
