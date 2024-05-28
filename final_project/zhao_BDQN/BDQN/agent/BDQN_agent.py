@@ -98,10 +98,10 @@ class BDQNAgent:
             """
             Transitions.states shall be of shape (4, 84, 84)
             """
-            batch_of_states: torch.Tensor = torch.cat([el.states for el in batch_of_transitions], dim=0).to(self.config.device)
+            batch_of_states: torch.Tensor = torch.cat([el.states.unsqueeze(0) for el in batch_of_transitions], dim=0).to(self.config.device)
             batch_of_action: Tuple[int] = tuple([el.action for el in batch_of_transitions])
             batch_of_reward: Tuple[float] = tuple([el.reward for el in batch_of_transitions])
-            batch_of_next_states: torch.Tensor = torch.cat([el.next_states for el in batch_of_transitions], dim=0).to(self.config.device)
+            batch_of_next_states: torch.Tensor = torch.cat([el.next_states.unsqueeze(0) for el in batch_of_transitions], dim=0).to(self.config.device)
             batch_of_done_flags: Tuple[bool] = tuple([el.done for el in batch_of_transitions])
             with torch.no_grad():
                 """
@@ -161,8 +161,8 @@ class BDQNAgent:
         """
         with torch.no_grad():
             batch_of_states_phi = self.policy_network(batch_of_states.unsqueeze(0))
-            batch_of_next_states_phi_policy = self.policy_network(batch_of_next_states.unsqueeze(0))
-            batch_of_next_states_phi_target = self.target_network(batch_of_next_states.unsqueeze(0))
+            batch_of_next_states_phi_policy = self.policy_network(batch_of_next_states)
+            batch_of_next_states_phi_target = self.target_network(batch_of_next_states)
             # calculate the expected Q-value of the next states using the target Q mean values
             """
             shape of $batch_of_q_next: (32, self.num_actions)
