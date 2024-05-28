@@ -419,7 +419,7 @@ class BDQNAgent:
             self.eval_pandas_df.to_csv(f, mode='a', header=f.tell()==0, index=False)
 
 
-    def save_training_record(self, training_episode_idx, csv_prefix: str):
+    def save_training_record(self, training_episode_idx: int, csv_prefix: str):
         episodal_data_row = {
             "training_episode_idx": training_episode_idx, 
             "num_total_time_steps": self.total_t_steps, 
