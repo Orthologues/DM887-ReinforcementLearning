@@ -4,7 +4,6 @@ which consists of three convolutional layers, one fully-connected layer to extra
 """
 
 from torch import nn
-from ..utils import Config
 from torch import nn, Tensor, relu
 
 class BdqnConvNet(nn.Module):
@@ -14,8 +13,6 @@ class BdqnConvNet(nn.Module):
     def __init__(self, input_dim, feature_dim=FEATURE_DIM, num_filters=32):
         super().__init__()
         self.init_body(input_dim, feature_dim, num_filters)
-        # feed this module to GPU
-        self.to(Config.DEVICE)
 
     def init_body(self, input_dim, output_dim, num_filters) -> None:
         """
