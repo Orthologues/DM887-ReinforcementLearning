@@ -1,7 +1,6 @@
 import numpy as np
 from torch import DeviceObjType, Tensor, nn, tensor, cat as concat_tensors
 from typing import Tuple, List, Union, Any, Dict
-from .config import Config
 
 """
 The class to construct the 
@@ -110,7 +109,7 @@ How to use it:
 2. __call__ method: normalized_state = self.normalizer(stack_of_processed_states, new_atari_state)
 """
 class AtariImageNormalizer(RescalingNormalizer):
-    def __init__(self, device: DeviceObjType, width = Config.STATE_WIDTH, height = Config.STATE_HEIGHT, frame_stack_size=Config.REPLAY_HISTORY_LENGTH, coef = 1.0 / 255, rbg2greyscale=True):
+    def __init__(self, device: DeviceObjType, width, height, frame_stack_size, coef = 1.0 / 255, rbg2greyscale=True):
         super().__init__(coef)
         self.frame_stack_size = frame_stack_size
         self.width = width

@@ -62,7 +62,7 @@ class Config:
         self.replay_memory_size = Config.REPLAY_SIZE # Replay function
 
         # normalizers for the input batch of tensors tensor of the convolutional neural network
-        self.state_normalizer = AtariImageNormalizer(device=self.device) # normalizer for the state, i.e., the input tensors of Atari games
+        self.state_normalizer = AtariImageNormalizer(device=self.device, width=Config.STATE_WIDTH, height=Config.STATE_HEIGHT, frame_stack_size=Config.REPLAY_HISTORY_LENGTH) # normalizer for the state, i.e., the input tensors of Atari games
 
         # normalizers for the agent exploration
         self.reward_normalizer = SignNormalizer() # normalizer for the reward
