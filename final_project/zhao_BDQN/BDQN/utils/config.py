@@ -37,7 +37,7 @@ class Config:
     MAX_EPISODAL_TIME_STEPS = 2 * 10**3 
     MAX_BLR_BATCH_SIZE = 10**4
     MAX_TRAINING_EPISODE = 5000
-    REPLAY_SIZE = 10**6
+    REPLAY_SIZE = 5 * 10**5
     CLIP_REWARDS = False
 
     def __init__(self, env_name: str, use_max_episodal_t_steps = True) -> None:
