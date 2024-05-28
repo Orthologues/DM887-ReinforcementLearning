@@ -294,7 +294,7 @@ class BDQNAgent:
         batch_of_actions: Tuple[int] = tuple([el.action for el in batch_of_transitions])
    
         # argmax_action_by_Q_policy.shape = (32, 1)
-        argmax_action_by_Q_policy = torch.argmax(torch.matmul(self.policy_network(batch_of_next_states), self.thompson_sampled_mean.T), dim = 1).to(device=self.config.device, dtype=torch.int32).detach().unsqueeze(-1)
+        argmax_action_by_Q_policy = torch.argmax(torch.matmul(self.policy_network(batch_of_next_states), self.thompson_sampled_mean.T), dim = 1).to(device=self.config.device, dtype=torch.int64).detach().unsqueeze(-1)
         # Q_target_next.shape = (32, self.num_actions)
         Q_target_next = torch.matmul(self.target_network(batch_of_next_states), self.target_mean.T).to(self.config.device)
         # Q_target_next_max.shape = (32, 1)
@@ -305,7 +305,7 @@ class BDQNAgent:
         # Q_policy_current.shape = (32, self.num_actions)
         Q_policy_current = torch.matmul(self.policy_network(batch_of_states), self.policy_mean.T).to(self.config.device)
         # Q_policy_observed_current.shape = (32, 1)
-        Q_policy_observed_current = Q_policy_current.gather(dim=1, index=torch.tensor(batch_of_actions).unsqueeze(-1)).to(dtype=torch.float64)
+        Q_policy_observed_current = Q_policy_current.gather(dim=1, index=torch.tensor(batch_of_actions).unsqueeze(-1).to(dtype=torch.int64)).to(dtype=torch.float64)
         
         # $loss is a scalar tensor
         loss: torch.Tensor = self.config.loss_function(Q_policy_observed_current, Q_target_next_expected)
@@ -330,7 +330,7 @@ class BDQNAgent:
         while True: 
             if self.config.max_t_steps_per_episode is not None:
                 if self.episodal_t_steps >= self.config.max_t_steps_per_episode: 
-                    print(f"max t steps per episode {self.config.max_t_steps_per_episode} reached")
+                    print(f"max t steps per episode {self.config.max_t_steps_per_episode} reached, episodal reward: {self.episodal_reward}, clipped reward: {self.episodal_clipped_reward}, episodal time steps: {self.episodal_t_steps}, total time steps: {self.total_t_steps}, total gradient descent time steps: {self.total_gd_t_steps}")
                     break
 
             states = next_states
@@ -418,7 +418,7 @@ class BDQNAgent:
         # Append the new row to the DataFrame
         self.eval_pandas_df.loc[len(self.eval_pandas_df)] = episodal_data_row
         with open(f"{csv_prefix}.csv", 'a') as f:
-            self.eval_pandas_df.to_csv(f, mode='a', header=f.tell()==0)
+            self.eval_pandas_df.to_csv(f, mode='a', header=f.tell()==0, index=False)
 
         
     def save_model(self, training_episode_idx: int, prefix: str):
@@ -438,7 +438,7 @@ class BDQNAgent:
         # Append the new row to the DataFrame
         self.training_pandas_df.loc[len(self.training_pandas_df)] = episodal_data_row
         with open(f"{directory}/training_record.csv", 'a') as f:
-            self.training_pandas_df.to_csv(f, mode='a', header=f.tell()==0)
+            self.training_pandas_df.to_csv(f, mode='a', header=f.tell()==0, index=False)
         
         torch.save(self.policy_network.state_dict(), f"{directory}/policy_dqn_.pth")
         torch.save(self.target_network.state_dict(), f"{directory}/target_dqn_.pth")
