@@ -17,7 +17,7 @@ class Config:
     TARGET_NETWORK_UPDATE_INTERVAL = 5 * 10**2
     TARGET_WEIGHT_UPDATE_INTERVAL = 4
     GD_UPDATE_INTERVAL = 20 # gradient descent update frequency for the policy Q-network
-    WARMUP_STEPS = 1 * 10**4
+    WARMUP_STEPS = 2 * 10**4
     THOMPSON_SAMPLING_INTERVAL = 2 * 10**3
     DISCOUNT = 0.99
     CONV_BATCH_SIZE = 32
@@ -32,7 +32,7 @@ class Config:
     SIGMA_VARIANCE = 0.001
     NOISE_VARIANCE = 1
     USE_SOFTMAX_POLICY = True
-    SKIP_FRAMES = True
+    SKIP_FRAMES = False
     FRAMES_TO_SKIP = 2
     MAX_EPISODAL_TIME_STEPS = 2 * 10**3 
     MAX_BLR_BATCH_SIZE = 10**4
