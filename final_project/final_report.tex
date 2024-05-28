@@ -1,0 +1,176 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{amsthm}
+\DeclareMathOperator{\argmax}{argmax}
+\DeclareMathOperator{\argmin}{argmin}
+\setlength\parindent{0pt}
+\setlength{\topmargin}{-3cm}
+\setlength{\textheight}{24cm}
+
+% ready for submission
+\usepackage[final]{neurips_2023}
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc}    
+\usepackage{hyperref}       
+\usepackage{url}            
+\usepackage{booktabs}       
+\usepackage{amsfonts}       
+\usepackage{nicefrac}       
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{xcolor}         
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{caption}
+
+
+\newlength\myindent
+\setlength\myindent{2em}
+\newcommand\bindent{%
+  \begingroup
+  \setlength{\itemindent}{\myindent}
+  \addtolength{\algorithmicindent}{\myindent}
+}
+\newcommand\eindent{\endgroup}
+
+
+\title{Final report of DM887 Final Project}
+
+\author{%
+  Jiawei Zhao, Kristóf Péter\\
+  Department of Mathematics and Computer Science\\
+  University of Southern Denmark\\
+  Moseskovvej, 5230 Odense \\
+  \texttt{jizha22@student.sdu.dk} \\
+  \texttt{krpet24@student.sdu.dk} \\
+}
+
+
+\begin{document}
+
+\maketitle
+
+
+\begin{abstract}
+  To implement the project \textbf{Learning to play Atari games with Bayesian Deep Expected SARSA}, we used \cite{BDQN} and \cite{EEtBDQN} as a baseline and theoretical framework. The Q-values used to determine the policy for each action are calculated as the matrix product of the output of a feature extractor neural network and a randomly generated Gaussian vector. The feature extractor is updated by gradient descent while the random vector's distribution is updated by a Bayesian posterior update based on a batch of explored states. In our algorithm we use the expected value of the next state's Q-values as part of the Bellman loss, instead of the maximal Q-value, which would be the case in standard Q-learning.
+\end{abstract}
+
+\section{Bayesian Deep Expected Sarsa Algorithm}
+
+\begin{algorithm}
+    \begin{algorithmic}[1]
+    \State \underline{Main Loop:}
+        \For {\(1,\dots,Episode Number\)}
+            \State $ state \gets reset\;environment$
+            \State $ state \gets$ Preprocess($state$)
+            \State \textbf{repeat}
+                \State $action \gets$ Policy($state$)
+                \State Act($action$, $state$)
+                \State observe $nextstate,\;action,\;reward,\;done$ after step
+                \State record $(state,\;action,\;nextstate,\;reward,\;done)$ to \textit{ReplayMemory}
+                \State $state \gets nextstate$
+                \State $stepcount$ += 1
+                \If{$stepcount$ mod $sampleFrequency$ $=$ $0$}
+                    \State $GaussianVectors$ = ThompsonSample()
+                \EndIf
+                \If{$stepcount$ mod $trainFrequency$ $=$ $0$}
+                    \State TrainModel()
+                \EndIf
+                \If{$stepcount$ mod $targetFrequency$ $=$ $0$}
+                    \State UpdateTargetNetwork()
+                    \If{$stepcount$ mod $posteriorFrequency$ $=$ $0$}
+                        \State $policyMeans$, $policyCovMatrices$ $\gets$ PosteriorUpdate()
+                        \For {i = 1,$\dots$,|Actions|}
+                            \State$policyMatrices[i] =$ CholeskyDecomposition($\frac{policyCovMatrices + policyCovMatrices^T}{2}$)
+                        \EndFor
+                    \EndIf
+                \EndIf
+            \State \textbf{until episode end}
+        \EndFor
+    \end{algorithmic}[1]
+\end{algorithm}
+
+\begin{algorithm}
+    \begin{algorithmic}[2]
+
+    \State \underline{Policy($state$):}
+        \State $features \gets$ PolicyNetwork($state$)
+        \State $Qvalues \gets GaussianVectors \cdot features^T$
+        \State $action \sim$ Softmax($Qvalues$)
+        \State Return $action$
+
+    \State \underline{Preprocess($state$,$nextframe$):}
+        \State $nextframe \gets$ transform $nextframe$ to $84\times84$
+        \If{firstState}
+            \State Return $[nextframe,\;nextframe,\;nextframe,\;nextframe]$
+        \Else
+            \State Return $[state[2],state[3],state[4],nextframe]$
+        \EndIf
+    
+    \State \underline{Act($action$, $state$):}
+        \State $cumulativeReward \gets 0$
+        \If{Frame skipping}
+            \For{1,\dots,$skippedFrames\;+\;1$}
+                \State step in the environment with $action$
+                \State observe $nextframe,\;action,\;reward,\;done$ after step
+                \State $cumulativeReward$ += $reward$
+            \EndFor
+        \ElsIf{No frame skipping}
+            \State step from $state$ with $action$
+            \State observe $nextframe,\;action,\;reward,\;done$ after step
+            \State $cumulativeReward$ += $reward$
+        \EndIf
+        \State $state \gets$ Preprocess($state$,$nextframe$)
+        \State Return $state$, $action$, $cumulativeReward$, $done$
+
+    \State \underline{ThompsonSample():}
+        \State independent sample $Z \sim \mathcal{N}(0,1, [featureLength\times1])$ 
+        \State $GaussianVectors = policyMeans + policyMatrices \cdot Z$
+        \State Return $GaussianVectors$
+
+    \State \underline{TrainModel():}
+        \State $batch \gets$ sample $batchSize$ from \textit{ReplayMemory}
+        \State $states,\;nextstates,\;actions,\;rewards\;done = \; batch$
+        \State $Qstates \gets$ PolicyNetwork($states$) $\cdot$ $policyMeans^T$
+        \State $QstatesActions \gets Qstates[actions]$
+        \State $Qnextstates \gets$ TargetNetwork($nextstates$) $\cdot$ $targetMeans^T$
+        \State $Probs \gets$ Softmax(TargetNetwork($nextstates$) $\cdot$ $targetMeans^T$)
+        \State $ExpectedQ \gets Qnextstates \cdot Probs$
+        \State $Loss =$ LossFunction($QstatesActions$, $rewards + (1-done)\cdot LR \cdot ExpectedQ$)
+        \State Update PolicyNetwork with GD step using $Loss$
+
+    \State \underline{UpdateTargetNetwork():}
+        \State TargetNetworkWeights $\gets$ PolicyNetworkWeights
+
+    \State \underline{PosteriorUpdate():}
+        \For{1,$\dots$,PosteriorBatchSize}
+            \State $batch \gets$ sample $size=1$ from \textit{ReplayMemory}
+            \State $state,\;nextstate,\;action,\;reward\;done = \; batch$
+            \State $\phi\phi^T[action] += PolicyNetwork(state) \cdot PolicyNetwork(state)^T$
+            \State $Qnextstate \gets$ TargetNetwork($nextstate$) $\cdot$ $targetMeans^T$
+            \State $Probs \gets$ Softmax(TargetNetwork($nextstates$) $\cdot$ $targetMeans^T$)
+            \State $ExpectedQ \gets Qnextstates \cdot Probs$
+            \State $\phi Y[action]  += PolicyNetwork(state)^T \cdot (reward + (1 - done) \cdot LR \cdot ExpectedQ$
+        \EndFor
+        \For{i = 1,$\dots$,|Actions|}
+                \State $inv = (\frac{\phi\phi^T[i]}{\sigma_n}  + \frac{1}{\sigma} * I)^{-1}$
+                \State $policyMeans[i] = \frac{inv \cdot \phi Y[i]}{\sigma_n}$
+                \State $policyCovMatrices[i] = \sigma * inv$
+        \EndFor
+        \State Return $policyMeans$, $policyCovMatrices$
+    \end{algorithmic}[2]
+\end{algorithm}
+
+\begin{thebibliography}{99}
+
+\bibitem{BDQN}
+\emph{BDQN Repository} \url{https://github.com/kazizzad/BDQN-MxNet-Gluon/blob/master/BDQN.ipynb}
+\newline
+\bibitem{EEtBDQN}
+\emph{Efficient Exploration through Bayesian Deep Q-Networks} \url{https://arxiv.org/pdf/1802.04412}
+
+\end{thebibliography}
+
+\end{document}
