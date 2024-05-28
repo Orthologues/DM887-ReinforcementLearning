@@ -133,7 +133,7 @@ class BDQNAgent:
     def thompson_sample(self) -> None:
         for i in range(self.num_actions):
             # gene
-            sample = tensor(torch.normal(0, 1, size=(self.phi_size, 1))).to(self.config.device).detach()
+            sample = torch.normal(0, 1, size=(self.phi_size, 1)).to(self.config.device).detach()
             """
             self.policy_mean[i].shape = (self.phi_size,)
             self.policy_cov_decom[i].shape = (self.phi_size, self.phi_size)
@@ -160,9 +160,9 @@ class BDQNAgent:
         shape of $batch_of_next_states_phi: (32, 512)
         """
         with torch.no_grad():
-            batch_of_states_phi = self.policy_network(batch_of_states)
-            batch_of_next_states_phi_policy = self.policy_network(batch_of_next_states)
-            batch_of_next_states_phi_target = self.target_network(batch_of_next_states)
+            batch_of_states_phi = self.policy_network(batch_of_states.unsqueeze(0))
+            batch_of_next_states_phi_policy = self.policy_network(batch_of_next_states.unsqueeze(0))
+            batch_of_next_states_phi_target = self.target_network(batch_of_next_states.unsqueeze(0))
             # calculate the expected Q-value of the next states using the target Q mean values
             """
             shape of $batch_of_q_next: (32, self.num_actions)
