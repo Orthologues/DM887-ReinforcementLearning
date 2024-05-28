@@ -64,7 +64,7 @@ class BDQNAgent:
         # initialization of the three-dimensional tensor of $\phi(x)\phi(x)^\top$
         self.phi_phi_t = torch.zeros(self.num_actions, self.phi_size, self.phi_size).to(self.config.device).detach()
         # initialization of the two-dimensional tensor of $\phi y$
-        self.phi_Qtarget = torch.zeros(self.num_actions, self.phi_size).to(self.config.device).detach()
+        self.phi__Q_target = torch.zeros(self.num_actions, self.phi_size).to(self.config.device).detach()
 
         # copy the state of policy network to initialize the target network
         self.target_network.load_state_dict(self.policy_network.state_dict())
@@ -110,19 +110,19 @@ class BDQNAgent:
                 shape of $batch_of_next_states_phi: (32, 512)
                 shape of $expected_q_target: (32, )
                 """
-                policy_state_phi, expected_q_target = self.extract_state_phi(batch_of_states, batch_of_reward, batch_of_next_states, batch_of_done_flags)
+                policy_state_phi, expected_Q_target = self.extract_state_phi(batch_of_states, batch_of_reward, batch_of_next_states, batch_of_done_flags)
             
                 for i in range(self.config.batch_size):
                     action = batch_of_action[i]
                     self.phi_phi_t[action] += torch.matmul(policy_state_phi[i].unsqueeze(0).T, policy_state_phi[i].unsqueeze(0)).to(self.config.device).detach()
-                    self.phi_Qtarget[action] += policy_state_phi[i] * expected_q_target[i].item()
+                    self.phi__Q_target[action] += policy_state_phi[i] * expected_Q_target[i].item()
 
                 for i in range(self.num_actions):
                     """
                     size of $inv: (512, 512)
                     """
                     inv = torch.inverse( self.phi_phi_t[i]/self.noise_variance + 1/self.prior_variance * torch.eye(self.phi_size).to(self.config.device).detach() ).to(self.config.device).detach()
-                    self.policy_mean[i] = torch.matmul(inv, self.phi_Qtarget[i]).to(self.config.device).detach() / self.noise_variance
+                    self.policy_mean[i] = torch.matmul(inv, self.phi__Q_target[i]).to(self.config.device).detach() / self.noise_variance
                     self.policy_cov[i] = self.prior_variance * inv
                     try:
                         self.policy_cov_decom[i] = torch.linalg.cholesky((self.policy_cov[i]+self.policy_cov[i].T)/2).to(self.config.device).detach()
@@ -153,7 +153,7 @@ class BDQNAgent:
     """
     def extract_state_phi(self, batch_of_states: torch.Tensor, batch_of_reward: Tuple[float], batch_of_next_states: torch.Tensor, batch_of_done_flags: Tuple[bool]) -> Tuple[Tensor, Tensor]:
         
-        batch_of_masks = tuple([1 if el == True else 0 for el in batch_of_done_flags])
+        batch_of_mask = tuple([0 if el == True else 1 for el in batch_of_done_flags])
 
         """
         shape of $batch_of_states_phi: (32, 512)
@@ -175,7 +175,9 @@ class BDQNAgent:
             prob_actions_by_Q_policy_next = nn.functional.softmax(Q_policy_next, dim=1).to(self.config.device)
             
             Q_target_next = torch.matmul(batch_of_next_states_phi_target, self.target_mean.T)
-            expected_Q_target_next = tensor(batch_of_reward).to(self.config.device) + self.config.gamma * (torch.ones((Config.CONV_BATCH_SIZE)).to(self.config.device)) - tensor(batch_of_masks).to(self.config.device) * torch.sum(prob_actions_by_Q_policy_next * Q_target_next, dim=1)
+            expected_Q_target_next = \
+                tensor(batch_of_reward).to(self.config.device) + \
+                self.config.gamma * tensor(batch_of_mask).to(self.config.device) * torch.sum(prob_actions_by_Q_policy_next * Q_target_next, dim=1)
             
         return batch_of_states_phi, expected_Q_target_next
 
@@ -286,17 +288,18 @@ class BDQNAgent:
         """
         batch_of_states: torch.Tensor = torch.cat([el.states.to(self.config.device).unsqueeze(0) for el in batch_of_transitions], dim=0)
         batch_of_next_states: torch.Tensor = torch.cat([el.next_states.to(self.config.device).unsqueeze(0) for el in batch_of_transitions], dim=0)
-        batch_of_done_flags: Tuple[bool] = tuple([el.done for el in batch_of_transitions])
-        batch_of_rewards: Tuple[int] = tuple([el.reward for el in batch_of_transitions])
-        batch_of_actions: Tuple[int] = tuple([el.action for el in batch_of_transitions])
-   
+        batch_of_done_flag: Tuple[bool] = tuple([el.done for el in batch_of_transitions])
+        batch_of_reward: Tuple[int] = tuple([el.reward for el in batch_of_transitions])
+        batch_of_action: Tuple[int] = tuple([el.action for el in batch_of_transitions])
+        batch_of_mask = tuple([0 if el == True else 1 for el in batch_of_done_flag])
+
         batch_of_states_phi = self.policy_network(batch_of_states)
         batch_of_next_states_phi_policy = self.policy_network(batch_of_next_states)
         batch_of_next_states_phi_target = self.target_network(batch_of_next_states)
         # Q_policy_current.shape = (32, self.num_actions)
         Q_policy_current = torch.matmul(batch_of_states_phi, self.thompson_sampled_weights.T).to(self.config.device)
         # Q_policy_observed_current.shape = (32, 1)
-        Q_policy_observed_current = Q_policy_current.gather(dim=1, index=torch.tensor(batch_of_actions, device=self.config.device).unsqueeze(-1).to(dtype=torch.int64)).to(dtype=torch.float64)
+        Q_policy_observed_current = Q_policy_current.gather(dim=1, index=torch.tensor(batch_of_action, device=self.config.device).unsqueeze(-1).to(dtype=torch.int64)).to(dtype=torch.float64)
         Q_policy_next = torch.matmul(batch_of_next_states_phi_policy, self.thompson_sampled_weights.T)
 
 
@@ -306,12 +309,12 @@ class BDQNAgent:
             # Q_target_next.shape = (32, self.num_actions)
             Q_target_next = torch.matmul(batch_of_next_states_phi_target, self.target_mean.T).to(self.config.device)
             # Q_target_expected.shape = (32, 1)
-            # Q_target_next_expected.shape = (32, 1)
-            Q_target_expected = (torch.sum(prob_actions_by_Q_policy_next * Q_target_next, dim=1) * torch.tensor(tuple([1-flag for flag in batch_of_done_flags]), device=self.config.device)).unsqueeze(-1)
-            Q_target_next_expected = (torch.tensor(batch_of_rewards, device=self.config.device).unsqueeze(-1) + self.config.gamma * Q_target_expected).to(dtype=torch.float64)
+            # expected_Q_target_next.shape = (32, 1)
+            Q_target_expected = (torch.sum(prob_actions_by_Q_policy_next * Q_target_next, dim=1) * torch.tensor(batch_of_mask).to(self.config.device)).unsqueeze(-1)
+            expected_Q_target_next = (torch.tensor(batch_of_reward, device=self.config.device).unsqueeze(-1) + self.config.gamma * Q_target_expected).to(dtype=torch.float64)
         
         # $loss is a scalar tensor
-        loss: torch.Tensor = self.config.loss_function(Q_policy_observed_current, Q_target_next_expected)
+        loss: torch.Tensor = self.config.loss_function(Q_policy_observed_current, expected_Q_target_next)
         loss = loss.to(device=self.config.device)
         self.optimizer.zero_grad()
         loss.backward()
