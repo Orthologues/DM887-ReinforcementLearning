@@ -19,7 +19,7 @@ class BDQNAgent:
     def __init__(self, config: Config):
         # configuration of the agent
         self.config = config
-        self.env = config.eval_env()
+        self.env = config.eval_env
         
         # attributes related to the states/actions
         self.num_actions = config.action_count
