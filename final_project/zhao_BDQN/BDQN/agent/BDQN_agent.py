@@ -347,11 +347,7 @@ class BDQNAgent:
             self.total_t_steps += 1
             self.episodal_t_steps += 1
             if done: 
-                print(f"episodal reward: {self.episodal_reward}, 
-                        clipped reward: {self.episodal_clipped_reward}, 
-                        episodal time steps: {self.episodal_t_steps},
-                        total time steps: {self.total_t_steps},
-                        total gradient descent time steps: {self.total_gd_t_steps}")
+                print(f"episodal reward: {self.episodal_reward}, clipped reward: {self.episodal_clipped_reward}, episodal time steps: {self.episodal_t_steps}, total time steps: {self.total_t_steps}, total gradient descent time steps: {self.total_gd_t_steps}")
                 break
 
             # update the network
