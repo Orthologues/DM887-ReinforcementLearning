@@ -298,17 +298,14 @@ class BDQNAgent:
         Q_policy_current = torch.matmul(batch_of_states_phi, self.policy_mean.T).to(self.config.device)
         # Q_policy_observed_current.shape = (32, 1)
         Q_policy_observed_current = Q_policy_current.gather(dim=1, index=torch.tensor(batch_of_action, device=self.config.device).unsqueeze(-1).to(dtype=torch.int64)).to(dtype=torch.float64)
-
-
-        with torch.no_grad():
-            Q_target_next = torch.matmul(batch_of_next_states_phi_target, self.target_mean.T)
-            # use the softmax function to infer the probablity of each action to calculate the expected Q_next
-            prob_actions_by_Q_policy_next = nn.functional.softmax(torch.matmul(batch_of_next_states_phi, self.thompson_sampled_weights.T), dim=1)
-            # Q_target_next.shape = (32, self.num_actions)
-            # Q_target_expected.shape = (32, 1)
-            # expected_Q_target_next.shape = (32, 1)
-            Q_target_expected = (torch.sum(prob_actions_by_Q_policy_next * Q_target_next, dim=1) * torch.tensor(batch_of_mask).to(self.config.device)).unsqueeze(-1)
-            expected_Q_target_next = (torch.tensor(batch_of_reward, device=self.config.device).unsqueeze(-1) + self.config.gamma * Q_target_expected).to(dtype=torch.float64)
+        Q_target_next = torch.matmul(batch_of_next_states_phi_target, self.target_mean.T)
+        # use the softmax function to infer the probablity of each action to calculate the expected Q_next
+        prob_actions_by_Q_policy_next = nn.functional.softmax(torch.matmul(batch_of_next_states_phi, self.thompson_sampled_weights.T), dim=1)
+        # Q_target_next.shape = (32, self.num_actions)
+        # Q_target_expected.shape = (32, 1)
+        # expected_Q_target_next.shape = (32, 1)
+        Q_target_expected = (torch.sum(prob_actions_by_Q_policy_next * Q_target_next, dim=1) * torch.tensor(batch_of_mask).to(self.config.device)).unsqueeze(-1)
+        expected_Q_target_next = (torch.tensor(batch_of_reward, device=self.config.device).unsqueeze(-1) + self.config.gamma * Q_target_expected).to(dtype=torch.float64)
         
         # $loss is a scalar tensor
         loss: torch.Tensor = self.config.loss_function(Q_policy_observed_current, expected_Q_target_next)
