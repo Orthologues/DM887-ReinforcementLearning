@@ -12,7 +12,7 @@ class Config:
     DEVICE = "cuda:0"
     """
     The frequency of a posterior update is 
-    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/2000
+    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/5000
     """
     TARGET_NETWORK_UPDATE_INTERVAL = 2500
     TARGET_WEIGHT_UPDATE_INTERVAL = 2
@@ -35,6 +35,9 @@ class Config:
     FRAMES_TO_SKIP = 4
     MAX_EPISODAL_TIME_STEPS = 2500 
     MAX_BLR_BATCH_SIZE = 10**5
+    """
+    The maximum possible number of total time steps is MAX_EPISODAL_TIME_STEPS * MAX_TRAINING_EPISODE = 10e7
+    """
     MAX_TRAINING_EPISODE = 4000
     REPLAY_SIZE = 2 * 10**5
     CLIP_REWARDS = False
