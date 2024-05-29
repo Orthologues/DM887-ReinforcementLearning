@@ -12,10 +12,10 @@ class Config:
     DEVICE = "cuda:0"
     """
     The frequency of a posterior update is 
-    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/5000
+    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/10000
     """
     TARGET_NETWORK_UPDATE_INTERVAL = 2500
-    TARGET_WEIGHT_UPDATE_INTERVAL = 2
+    TARGET_WEIGHT_UPDATE_INTERVAL = 4
     GD_UPDATE_INTERVAL = 10 # gradient descent update frequency for the policy Q-network
     WARMUP_STEPS = 2 * 10**4
     THOMPSON_SAMPLING_INTERVAL = 10**3
@@ -25,7 +25,7 @@ class Config:
     STATE_HEIGHT = 84
     DEFAULT_OPTIMIZER_FN = lambda params: torch.optim.Adam(
     params, lr=2.5e-3, betas=(0.9, 0.999), eps=0.01) 
-    REPLAY_HISTORY_LENGTH = 5
+    REPLAY_HISTORY_LENGTH = 4
     REPLAY_BUFFER = lambda capacity: ReplayMemory(capacity)
     CONV_NETWORK = lambda input_dim: BdqnConvNet(input_dim)
     SIGMA_VARIANCE = 0.001

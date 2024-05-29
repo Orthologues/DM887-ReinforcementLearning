@@ -367,8 +367,8 @@ class BDQNAgent:
                     # update the weight and covariance matrices of the target Q values
                     if self.target_network_update_count_per_target_weight_update == self.config.target_weight_update_interval:
                          self.posterior_update()
-                         self.target_mean = self.policy_mean
-                         self.target_cov = self.policy_cov
+                         self.target_mean = self.policy_mean.detach().clone()
+                         self.target_cov = self.policy_cov.detach().clone()
                          self.target_network_update_count_per_target_weight_update = 0
 
     """
