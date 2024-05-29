@@ -12,11 +12,11 @@ class Config:
     DEVICE = "cuda:0"
     """
     The frequency of a posterior update is 
-    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/10000
+    1/(Config.TARGET_NETWORK_UPDATE_INTERVAL * Config.TARGET_WEIGHT_UPDATE_INTERVAL) = 1/20000
     """
-    TARGET_NETWORK_UPDATE_INTERVAL = 2500
+    TARGET_NETWORK_UPDATE_INTERVAL = 5000
     TARGET_WEIGHT_UPDATE_INTERVAL = 4
-    GD_UPDATE_INTERVAL = 10 # gradient descent update frequency for the policy Q-network
+    GD_UPDATE_INTERVAL = 4 # gradient descent update frequency for the policy Q-network
     WARMUP_STEPS = 2 * 10**4
     THOMPSON_SAMPLING_INTERVAL = 10**3
     DISCOUNT = 0.99
@@ -38,7 +38,7 @@ class Config:
     """
     The maximum possible number of total time steps is MAX_EPISODAL_TIME_STEPS * MAX_TRAINING_EPISODE = 10e7
     """
-    MAX_TRAINING_EPISODE = 4000
+    MAX_TRAINING_EPISODE = 10**4
     REPLAY_SIZE = 2 * 10**5
     CLIP_REWARDS = False
 
