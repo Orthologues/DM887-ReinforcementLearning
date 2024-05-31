@@ -176,10 +176,13 @@ The output of the neural network for a singular $s$ input will be a feature vect
 
 \section{Implementation of the Deep Expected Sarsa Variant}
 \begin{enumerate}
-    \item We use a $Softmax$ policy instead of $\epsilon$-greedy or greedy policy based on the $argmax$ actions of a $Q$ table or $Q$ function. \newline\newline \textbf{See: Assistant functions: Policy}
-    \item When training the policy network we approximate the expected value of the $Q_{target}(s')$ Q-values at next state by taking the dot product of $M^T\phi_{target}(B_{s'})$ with the $Softmax$ function of $W^T\phi_{s'}$. This value will be used to minimize the Bellman loss, instead of 
-    \item 
-    \item We approximate the expected value of the $Q_{target}(s')$ Q-values at next state by calculating the $Softmax$ function of $Q_{target}(s') = M^T\phi_{target}(B_{s'})$, and taking its dot product with the   in the case of the Posterior Update and the $Softmax$ function of $Q(s') = $ (note that there may be a better way to approximate the expected $Q$-values) during both the gradient descent updates of $\phi$ and the posterior updates of $W$.\newline\newline \textbf{See: Training Functions: TrainModel: lines 12-18, PosteriorUpdate: lines 30-36}
+    \item We use a $Softmax$ policy instead of $\epsilon$-greedy or greedy policy based on the $argmax$ actions of a $Q$ table or a $Q$ function. \newline\newline \textbf{See: Assistant functions: Policy}
+    \item When training the policy network we approximate the expected value of the $Q_{target}(s')$ Q-values at next state by taking the dot product of $M^T\phi_{target}(s')$ with the $Softmax$ function of the next state policy $Q$ values, $Softmax(W^T\phi(s'))$. This value will be used to minimize the Bellman loss, instead of taking $M^T\phi_{target}(s')$ at the coordinate $a = argmax(W^T\phi_{s'})$ as in \cite{EEtBDQN}, which was more of a standard $Q$-learning approach.\newline\newline
+    \textbf{See: Training Functions: TrainModel: lines 12-18}
+    \item In the case of the posterior update, we take $Softmax(M^T\phi_{target}(s')) \cdot M^T\phi_{target}(s')$ as our 
+    expected value estimate, as a replacement for the simpler way of taking the maximum of the $M^T\phi_{target}(s')$ value.\newline\newline
+    \textbf{See: Training Functions: PosteriorUpdate: lines 30-36} \newline\newline
+    (note that there may be a better way to approximate the expected $Q$-values during both the gradient descent updates of $\phi$ and the posterior updates of $W$)
 \end{enumerate}
 
 \clearpage
@@ -366,7 +369,7 @@ One of the main reasons we decided to follow \cite{BDQN} and \cite{EEtBDQN} was 
   \caption{Results from \cite{BDQN}, on the Pong environment.}
   \label{fig:sub2}
 \end{subfigure}
-\caption{Their model was able to produce fairly good results after around 1 million steps in both environments, and really good ones after $10$ and $100$ million steps. We have only ran our algorithms for at most a few million steps, however we couldn't come close to even an average reward of 20. We don't have any information about the exact hyperparameters used for these tests, which could be able to bring our algorithms to similar learning speeds.}
+\caption{Their model was able to produce fairly good results after around 1 million steps in both environments, and really good ones after $10$ and $100$ million steps. We have only ran our algorithms for at most a few million steps, however we couldn't come close to even an average reward of 20. We don't have any information about the exact hyperparameters used for these tests, which could be bring our algorithm to similar learning speeds as well.}
 %\label{fig:test}
 \end{figure}
 
