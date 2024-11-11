@@ -42,5 +42,5 @@ def learn_tennisV5():
 
 if __name__ == "__main__":
     learn_pongV5()
-    learn_tennisV5()
+    #learn_tennisV5()
     learn_breakoutV5()
