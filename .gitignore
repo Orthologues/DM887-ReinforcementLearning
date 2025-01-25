@@ -7,5 +7,6 @@ GridWorld/
 *.aux
 *.fdb_latexmk
 *.log
+*.txt
 *.synctex.gz
 __pycache__/

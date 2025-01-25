@@ -1,4 +1,4 @@
-#! /opt/homebrew/anaconda3/bin/python
+#! /home/jiz/anaconda3/bin/python
 
 from collections import namedtuple
 import torch

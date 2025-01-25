@@ -1,4 +1,4 @@
-#! /opt/homebrew/anaconda3/bin/python
+#! /home/jiz/anaconda3/bin/python
 
 import gymnasium as gym
 import math
@@ -98,10 +98,10 @@ class ReplayMemory(object):
 class LSTD_DQL_learner():
 
     def __init__(self, 
-                 device:str, 
                  env_name: str, 
                  n_actions: int, 
                  encoding_dim: int, 
+                 device: str = "cuda:0",
                  batch_size: int=32, 
                  gamma: float=0.9, 
                  lambda_val=1e-3, 
